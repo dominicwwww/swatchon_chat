@@ -1,0 +1,45 @@
+{
+  "fbo": {
+    "shipment_request": {
+      "title": "FBO 출고 요청",
+      "content": "[SwatchOn] {seller_name}님 안녕하세요.\n\n다음 주문의 출고를 요청드립니다.\n\n- 주문번호: {order_number}\n- 상품명: {product_name}\n- 수량: {quantity}개\n\n감사합니다.",
+      "variables": ["seller_name", "order_number", "product_name", "quantity"],
+      "last_modified": "2023-05-10T08:30:00Z"
+    },
+    "shipment_confirm": {
+      "title": "FBO 출고 확인",
+      "content": "[SwatchOn] {seller_name}님\n\n출고 확인되었습니다.\n\n- 주문번호: {order_number}\n- 송장번호: {tracking_number}\n\n감사합니다.",
+      "variables": ["seller_name", "order_number", "tracking_number"],
+      "last_modified": "2023-05-10T08:30:00Z"
+    },
+    "po": {
+      "title": "FBO 발주 확인 요청",
+      "content": "[SwatchOn] {seller_name}님\n\n발주 확인 요청드립니다.\n\n- 발주번호: {po_number}\n- 상품명: {product_name}\n- 수량: {quantity}개\n\n감사합니다.",
+      "variables": ["seller_name", "po_number", "product_name", "quantity"],
+      "last_modified": "2023-05-10T08:30:00Z"
+    }
+  },
+  "sbo": {
+    "po": {
+      "title": "SBO 스와치 발주",
+      "content": "[SwatchOn] {seller_name}님\n\n스와치 발주합니다.\n\n- 주문번호: {order_number}\n- 스와치 정보: {swatch_details}\n\n감사합니다.",
+      "variables": ["seller_name", "order_number", "swatch_details"],
+      "last_modified": "2023-05-10T08:30:00Z"
+    },
+    "pickup_request": {
+      "title": "SBO 스와치 픽업 요청",
+      "content": "[SwatchOn] {seller_name}님\n\n스와치 픽업 요청드립니다.\n\n- 주문번호: {order_number}\n- 픽업 날짜: {pickup_date}\n- 픽업 시간: {pickup_time}\n\n감사합니다.",
+      "variables": ["seller_name", "order_number", "pickup_date", "pickup_time"],
+      "last_modified": "2023-05-10T08:30:00Z"
+    }
+  },
+  "defaults": {
+    "header": "[SwatchOn]",
+    "footer": "\n\n감사합니다.\nSwatchOn 팀 드림."
+  },
+  "settings": {
+    "version": "1.0",
+    "last_modified": "2023-05-10T08:30:00Z",
+    "created_by": "SwatchOn"
+  }
+} 

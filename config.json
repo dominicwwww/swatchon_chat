@@ -1,0 +1,40 @@
+{
+  "google_credentials": "D:/dev/swatchon_chat/kakaotalk-427704-676be7d19846.json",
+  "fbo_shipment_request_spreadsheet_url": "https://docs.google.com/spreadsheets/d/1xiH2opDnR570-N0nXPYpVPFNSksrwQqeEAb2YHFOp0Q/edit?usp=sharing",
+  "fbo_shipment_request_sheet_name": "",
+  "fbo_shipment_confirm_spreadsheet_url": "dfsaf",
+  "fbo_shipment_confirm_sheet_name": "출고확인",
+  "fbo_po_spreadsheet_url": "sadf",
+  "fbo_po_sheet_name": "발주확인요청",
+  "fbo_receive_spreadsheet_url": "https://admin.swatchon.me/purchase_products/receive_index",
+  "fbo_receive_sheet_name": "입고확인",
+  "sbo_po_spreadsheet_url": "saf",
+  "sbo_po_sheet_name": "스와치발주",
+  "sbo_pickup_request_spreadsheet_url": "saf",
+  "sbo_pickup_request_sheet_name": "스와치픽업요청",
+  "address_book_spreadsheet_url": "https://docs.google.com/spreadsheets/d/1EsSjZj6ookvVsaWwBXbv23npfaU4BKoNjzTcYF-S0P8/edit?gid=97512522#gid=97512522",
+  "address_book_sheet_name": "주소록",
+  "swatchon_admin_url": "https://admin.swatchon.me/users/sign_in",
+  "swatchon_username": "dominic@swatchon.com",
+  "swatchon_password": "870808",
+  "default_wait_time": 10,
+  "log_level": "INFO",
+  "ui_theme": "dark",
+  "templates_path": "templates.json",
+  "last_section": "fbo_shipment_request",
+  "save_logs": true,
+  "logs_path": "logs",
+  "kakao_path": "",
+  "auto_start_kakao": false,
+  "message_delay": 1000,
+  "api_limit": 60,
+  "window_size": [
+    1891,
+    1077
+  ],
+  "window_pos": [
+    406,
+    214
+  ],
+  "receive_scraping_url": "https://admin.swatchon.me/purchase_products/receive_index"
+}

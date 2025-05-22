@@ -1,0 +1,17 @@
+PySide6
+pywin32==310           # Windows API 액세스 (카카오톡 제어)
+gspread==5.3.2         # 구글 스프레드시트 API
+oauth2client==4.1.3    # 구글 API 인증
+google-api-python-client==2.47.0  # 구글 API 클라이언트
+google-auth-httplib2==0.1.0       # 구글 인증
+google-auth-oauthlib==0.5.1       # 구글 OAuth
+pandas>=2.2.0          # 데이터 처리
+selenium==4.1.5        # 웹 브라우저 자동화 (스크래핑)
+webdriver-manager==3.5.4 # 웹드라이버 관리
+cryptography==37.0.2    # 암호화 (보안 정보 저장)
+requests==2.27.1        # HTTP 요청
+beautifulsoup4==4.11.1  # HTML 파싱
+python-dateutil==2.8.2  # 날짜 처리
+pydantic==1.9.1        # 데이터 검증 및 스키마
+typing-extensions==4.2.0 # 타입 힌트 확장
+psutil==7.0.0          # 프로세스 및 시스템 유틸리티 (프로세스 관리) 
