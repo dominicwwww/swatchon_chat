@@ -21,6 +21,8 @@ from ui.theme import get_theme
 from services.shipment_request_scraper import ShipmentRequestScraper
 from ui.components.log_widget import LOG_INFO, LOG_DEBUG, LOG_WARNING, LOG_ERROR, LOG_SUCCESS
 from ui.components.shipment_request_table import ShipmentRequestTable
+from services.api_service import ApiService
+from core.schemas import PurchaseProduct
 
 class ShipmentRequestSection(BaseSection):
     """
@@ -93,16 +95,6 @@ class ShipmentRequestSection(BaseSection):
         stats_layout.addWidget(self.stats_label)
         stats_layout.addStretch()
         
-        # 선택 버튼들
-        self.select_all_button = QPushButton("모두 선택")
-        self.select_all_button.clicked.connect(self._on_select_all_clicked)
-        
-        self.deselect_all_button = QPushButton("모두 해제")
-        self.deselect_all_button.clicked.connect(self._on_deselect_all_clicked)
-        
-        stats_layout.addWidget(self.select_all_button)
-        stats_layout.addWidget(self.deselect_all_button)
-        
         self.content_layout.addWidget(stats_widget)
     
     def _on_table_selection_changed(self, selected_items):
@@ -159,14 +151,6 @@ class ShipmentRequestSection(BaseSection):
         except Exception as e:
             print(f"[ShipmentRequestSection] 테이블 업데이트 중 예외: {e}")
     
-    def _on_select_all_clicked(self):
-        """모두 선택 버튼 클릭 이벤트"""
-        self.table.select_all()
-    
-    def _on_deselect_all_clicked(self):
-        """모두 해제 버튼 클릭 이벤트"""
-        self.table.deselect_all()
-    
     def _on_search_changed(self, text):
         """검색어 변경 이벤트"""
         self.apply_filters()
@@ -178,39 +162,24 @@ class ShipmentRequestSection(BaseSection):
         self.update_table()
     
     def _on_refresh_clicked(self):
-        """새로고침 버튼 클릭 이벤트"""
+        """새로고침 버튼 클릭 이벤트 (API 연동)"""
         try:
-            self.log("출고 요청 데이터를 새로고침합니다.", LOG_INFO)
-            
-            # 이미 스크래핑 중인지 확인
-            if hasattr(self, 'scraping_completed') and not self.scraping_completed:
-                self.log("이미 데이터를 가져오는 중입니다.", LOG_WARNING)
-                try:
-                    QMessageBox.information(self, "처리 중", "데이터를 가져오는 중입니다. 잠시만 기다려주세요.")
-                except Exception:
-                    pass
+            self.log("출고 요청 데이터를 API에서 새로고침합니다.", LOG_INFO)
+            # API 호출
+            product_list = ApiService.get_purchase_products()
+            if not product_list or not product_list.items:
+                self.log("API에서 데이터를 받아오지 못했습니다.", LOG_WARNING)
+                QMessageBox.warning(self, "API 오류", "API에서 데이터를 받아오지 못했습니다.")
                 return
-            
-            # 확인 메시지
-            try:
-                reply = QMessageBox.question(
-                    self, 
-                    "데이터 새로고침", 
-                    "스와치온 관리자 페이지에서 출고 요청 데이터를 가져오시겠습니까?\n\n이 작업은 시간이 다소 소요될 수 있습니다.",
-                    QMessageBox.Yes | QMessageBox.No, 
-                    QMessageBox.No
-                )
-                
-                if reply == QMessageBox.Yes:
-                    self.load_data_from_scraper()
-            except Exception as dialog_error:
-                self.log(f"대화상자 표시 중 오류: {str(dialog_error)}", LOG_ERROR)
-                # 오류가 발생해도 진행 시도
-                self.load_data_from_scraper()
+            # 데이터 저장 및 테이블 갱신
+            self.all_data = product_list.items
+            self.filtered_data = self.all_data.copy()
+            self.stats_label.setText(f"총 {len(self.filtered_data)}건")
+            self.update_table()
+            self.log(f"API 데이터 {len(self.all_data)}건 로드 완료", LOG_SUCCESS)
         except Exception as e:
-            self.log(f"새로고침 버튼 처리 중 예상치 못한 오류: {str(e)}", LOG_ERROR)
-            import traceback
-            self.log(f"상세 오류: {traceback.format_exc()}", LOG_ERROR)
+            self.log(f"API 새로고침 중 오류: {str(e)}", LOG_ERROR)
+            QMessageBox.critical(self, "API 오류", f"API 새로고침 중 오류: {str(e)}")
     
     def _on_send_clicked(self):
         """메시지 전송 버튼 클릭 이벤트"""

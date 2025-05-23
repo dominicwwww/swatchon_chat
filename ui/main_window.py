@@ -36,7 +36,7 @@ class MainWindow(QMainWindow):
         # 메인 위젯
         main_widget = QWidget()
         main_layout = QHBoxLayout(main_widget)
-        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setContentsMargins(30, 30, 30, 30)  # 전체 패딩 추가
         main_layout.setSpacing(0)
         
         # 사이드바

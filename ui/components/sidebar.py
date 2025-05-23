@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal, QSize, QMargins
 from PySide6.QtGui import QIcon, QPixmap, QColor, QFont
+import qtawesome as qta
 
 from core.types import SectionType, SidebarItemType
 from ui.theme import get_theme
@@ -15,12 +16,12 @@ from ui.theme import get_theme
 class SidebarButton(QPushButton):
     """사이드바 버튼 위젯"""
     
-    def __init__(self, text: str, icon_path: Optional[str] = None, parent=None):
+    def __init__(self, text: str, icon_name: str = None, parent=None):
         super().__init__(text, parent)
         
-        # 아이콘 설정
-        if icon_path:
-            self.setIcon(QIcon(icon_path))
+        # 아이콘 설정 (qtawesome)
+        if icon_name:
+            self.setIcon(qta.icon(icon_name))
             self.setIconSize(QSize(18, 18))
         
         # 고정 높이 설정
@@ -175,7 +176,7 @@ class Sidebar(QWidget):
         bottom_layout = QVBoxLayout(bottom_widget)
         bottom_layout.setContentsMargins(8, 8, 8, 8)
         
-        settings_button = SidebarButton("설정")
+        settings_button = SidebarButton("설정", icon_name="ph.gear")
         settings_button.clicked.connect(lambda: self._on_button_clicked(SectionType.SETTINGS.value))
         
         bottom_layout.addWidget(settings_button)
@@ -199,7 +200,7 @@ class Sidebar(QWidget):
     def _create_sidebar_items(self):
         """사이드바 아이템 생성"""
         # 대시보드
-        dashboard_btn = SidebarButton("대시보드")
+        dashboard_btn = SidebarButton("대시보드", icon_name="ph.house")
         dashboard_btn.clicked.connect(lambda: self._on_button_clicked(SectionType.DASHBOARD.value))
         self.scroll_layout.addWidget(dashboard_btn)
         self._buttons[SectionType.DASHBOARD.value] = dashboard_btn
@@ -211,7 +212,7 @@ class Sidebar(QWidget):
         self.scroll_layout.addWidget(SidebarCategory("FBO"))
         
         # FBO 출고 요청
-        fbo_shipment_req_btn = SidebarButton("출고 요청")
+        fbo_shipment_req_btn = SidebarButton("출고 요청", icon_name="ph.truck")
         fbo_shipment_req_btn.clicked.connect(
             lambda: self._on_button_clicked(SectionType.FBO_SHIPMENT_REQUEST.value)
         )
@@ -219,7 +220,7 @@ class Sidebar(QWidget):
         self._buttons[SectionType.FBO_SHIPMENT_REQUEST.value] = fbo_shipment_req_btn
         
         # FBO 출고 확인
-        fbo_shipment_conf_btn = SidebarButton("출고 확인")
+        fbo_shipment_conf_btn = SidebarButton("출고 확인", icon_name="ph.check")
         fbo_shipment_conf_btn.clicked.connect(
             lambda: self._on_button_clicked(SectionType.FBO_SHIPMENT_CONFIRM.value)
         )
@@ -227,7 +228,7 @@ class Sidebar(QWidget):
         self._buttons[SectionType.FBO_SHIPMENT_CONFIRM.value] = fbo_shipment_conf_btn
         
         # FBO 발주 확인
-        fbo_po_btn = SidebarButton("발주 확인")
+        fbo_po_btn = SidebarButton("발주 확인", icon_name="ph.clipboard-text")
         fbo_po_btn.clicked.connect(
             lambda: self._on_button_clicked(SectionType.FBO_PO.value)
         )
@@ -241,7 +242,7 @@ class Sidebar(QWidget):
         self.scroll_layout.addWidget(SidebarCategory("SBO"))
         
         # SBO 스와치 발주
-        sbo_po_btn = SidebarButton("스와치 발주")
+        sbo_po_btn = SidebarButton("스와치 발주", icon_name="ph.tag")
         sbo_po_btn.clicked.connect(
             lambda: self._on_button_clicked(SectionType.SBO_PO.value)
         )
@@ -249,7 +250,7 @@ class Sidebar(QWidget):
         self._buttons[SectionType.SBO_PO.value] = sbo_po_btn
         
         # SBO 픽업 요청
-        sbo_pickup_btn = SidebarButton("픽업 요청")
+        sbo_pickup_btn = SidebarButton("픽업 요청", icon_name="ph.package")
         sbo_pickup_btn.clicked.connect(
             lambda: self._on_button_clicked(SectionType.SBO_PICKUP_REQUEST.value)
         )
@@ -263,7 +264,7 @@ class Sidebar(QWidget):
         self.scroll_layout.addWidget(SidebarCategory("도구"))
         
         # 템플릿 관리
-        template_btn = SidebarButton("템플릿 관리")
+        template_btn = SidebarButton("템플릿 관리", icon_name="ph.squares-four")
         template_btn.clicked.connect(
             lambda: self._on_button_clicked(SectionType.TEMPLATE.value)
         )
@@ -271,7 +272,7 @@ class Sidebar(QWidget):
         self._buttons[SectionType.TEMPLATE.value] = template_btn
         
         # 설정 버튼 추가
-        self._buttons[SectionType.SETTINGS.value] = SidebarButton("설정")
+        self._buttons[SectionType.SETTINGS.value] = SidebarButton("설정", icon_name="ph.gear")
     
     def _on_button_clicked(self, section_type: str):
         """버튼 클릭 이벤트 처리"""

@@ -103,4 +103,33 @@ class TemplateCollection(BaseModel):
     fbo: Dict[str, MessageTemplate] = Field(default_factory=dict)
     sbo: Dict[str, MessageTemplate] = Field(default_factory=dict)
     defaults: Dict[str, str] = Field(default_factory=dict)
-    settings: Dict[str, Any] = Field(default_factory=dict) 
+    settings: Dict[str, Any] = Field(default_factory=dict)
+
+
+class PurchaseProduct(BaseModel):
+    """구매 상품 스키마"""
+    id: int = Field(..., description="상품 ID")
+    store_name: str = Field(..., description="스토어명")
+    store_address: str = Field("", description="스토어 주소")
+    store_ddm_address: str = Field(..., description="동대문 주소")
+    quality_name: str = Field(..., description="품질명")
+    color_number: int = Field(..., description="컬러 번호")
+    color_code: Optional[str] = Field(None, description="컬러 코드")
+    quantity: int = Field(..., description="수량")
+    purchase_code: str = Field(..., description="구매 코드")
+    pickup_at: datetime = Field(..., description="픽업 일시")
+    delivery_method: str = Field(..., description="배송 방법")
+    logistics_company: Optional[str] = Field(None, description="물류 회사")
+    status: str = Field(..., description="상태")
+
+    class Config:
+        """Pydantic 설정"""
+        json_encoders = {
+            datetime: lambda v: v.isoformat()
+        }
+
+
+class PurchaseProductList(BaseModel):
+    """구매 상품 목록 스키마"""
+    items: List[PurchaseProduct] = Field(default_factory=list)
+    total: int = Field(0, description="전체 개수") 

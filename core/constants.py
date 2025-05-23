@@ -133,4 +133,33 @@ SECTION_SPREADSHEET_MAPPING = {
         "url_key": SpreadsheetConfigKey.SBO_PICKUP_REQUEST_URL.value,
         "sheet_key": SpreadsheetConfigKey.SBO_PICKUP_REQUEST_SHEET.value
     }
+}
+
+# RemixIcon 사이드바 아이콘 경로 매핑
+SECTION_ICON_PATHS = {
+    "dashboard": "assets/icons/dashboard-line.svg",
+    "fbo_shipment_request": "assets/icons/truck-line.svg",
+    "fbo_shipment_confirm": "assets/icons/check-line.svg",
+    "fbo_po": "assets/icons/file-list-2-line.svg",
+    "sbo_po": "assets/icons/price-tag-3-line.svg",
+    "sbo_pickup_request": "assets/icons/box-3-line.svg",
+    "template": "assets/icons/layout-2-line.svg",
+    "settings": "assets/icons/settings-3-line.svg",
+}
+
+# API 관련 상수
+API_BASE_URL = "https://admin.swatchon.me/api"
+API_KEY = "CkhbWmgJV51nxuTsiKiHmel8QUuoHnxUtjSQ812FxEexVfen"
+
+# API 엔드포인트
+API_ENDPOINTS = {
+    "purchase_products": "/purchase_products",
+    "shipment_requests": "/shipment_requests",
+    "shipment_confirmations": "/shipment_confirmations"
+}
+
+# API 헤더
+API_HEADERS = {
+    "X-Api-Key": API_KEY,
+    "Content-Type": "application/json"
 } 
