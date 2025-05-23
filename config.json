@@ -29,12 +29,12 @@
   "message_delay": 1000,
   "api_limit": 60,
   "window_size": [
-    1891,
-    1077
+    1200,
+    1361
   ],
   "window_pos": [
-    406,
-    214
+    680,
+    0
   ],
   "receive_scraping_url": "https://admin.swatchon.me/purchase_products/receive_index"
 }

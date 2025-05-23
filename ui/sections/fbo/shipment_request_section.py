@@ -82,7 +82,7 @@ class ShipmentRequestSection(BaseSection):
         # 테이블 위젯
         self.table = ShipmentRequestTable()
         self.table.selection_changed.connect(self._on_table_selection_changed)
-        self.content_layout.addWidget(self.table)
+        self.content_layout.addWidget(self.table.main_widget)
         
         # 통계 정보
         stats_widget = QWidget()
