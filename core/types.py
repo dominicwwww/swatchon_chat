@@ -30,10 +30,13 @@ class ShipmentStatus(Enum):
     RETRY = "재시도대기"         # 재시도 대기 중
 
 # 메시지 상태 열거형
-class MessageStatus(Enum):
+class MessageStatus(str, Enum):
     PENDING = "대기중"
+    SENDING = "전송중"
     SENT = "전송완료"
     FAILED = "전송실패"
+    CANCELLED = "취소됨"
+    RETRY_WAITING = "재시도대기"
 
 # UI 섹션 유형
 class SectionType(Enum):

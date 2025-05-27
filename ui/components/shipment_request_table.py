@@ -15,6 +15,7 @@ from ui.theme import get_theme
 from ui.components.log_widget import LOG_INFO, LOG_WARNING, LOG_ERROR
 from core.schemas import PurchaseProduct
 from core.constants import DELIVERY_METHODS, LOGISTICS_COMPANIES, TABLE_COLUMN_NAMES, API_FIELDS
+from core.types import MessageStatus
 
 class ShipmentRequestTable(QTableWidget):
     """FBO 출고 요청 테이블 컴포넌트"""
@@ -74,6 +75,16 @@ class ShipmentRequestTable(QTableWidget):
         self.clear_selection_button.clicked.connect(self._on_clear_selection_clicked)
         self.clear_selection_button.setMaximumWidth(80)
         self.top_layout.addWidget(self.clear_selection_button)
+        
+        # 상태 필터
+        self.status_filter = QComboBox()
+        self.status_filter.addItem("모든 상태", "all")
+        self.status_filter.addItem("전송완료", "sent")
+        self.status_filter.addItem("전송실패", "failed")
+        self.status_filter.addItem("취소됨", "cancelled")
+        self.status_filter.setCurrentIndex(0)  # 초기값을 "모든 상태"로 설정
+        self.status_filter.currentIndexChanged.connect(self._on_filter_changed)
+        self.top_layout.addWidget(self.status_filter)
         
         # 레이아웃 정렬
         self.top_layout.addStretch()
@@ -193,19 +204,19 @@ class ShipmentRequestTable(QTableWidget):
                     message_status_item = QTableWidgetItem(message_status_text)
                     
                     # 메시지 상태에 따른 색상 설정
-                    if message_status_text == "전송완료":
+                    if message_status_text == MessageStatus.SENT.value:
                         message_status_item.setBackground(QColor(212, 237, 218))  # 연한 초록색
                         message_status_item.setForeground(QColor(21, 87, 36))     # 진한 초록색
-                    elif message_status_text == "전송실패":
+                    elif message_status_text == MessageStatus.FAILED.value:
                         message_status_item.setBackground(QColor(248, 215, 218))  # 연한 빨간색
                         message_status_item.setForeground(QColor(114, 28, 36))    # 진한 빨간색
-                    elif message_status_text == "전송중":
+                    elif message_status_text == MessageStatus.IN_PROGRESS.value:
                         message_status_item.setBackground(QColor(255, 243, 205))  # 연한 노란색
                         message_status_item.setForeground(QColor(133, 100, 4))    # 진한 노란색
-                    elif message_status_text == "취소됨":
+                    elif message_status_text == MessageStatus.CANCELLED.value:
                         message_status_item.setBackground(QColor(233, 236, 239))  # 연한 회색
                         message_status_item.setForeground(QColor(73, 80, 87))     # 진한 회색
-                    elif message_status_text == "재시도대기":
+                    elif message_status_text == MessageStatus.RETRY_WAITING.value:
                         message_status_item.setBackground(QColor(217, 237, 247))  # 연한 파란색
                         message_status_item.setForeground(QColor(12, 84, 96))     # 진한 파란색
                     
@@ -229,12 +240,14 @@ class ShipmentRequestTable(QTableWidget):
     
     def _on_any_checkbox_changed(self, state: int):
         """체크박스 상태 변경 이벤트"""
-        # 모든 체크박스 상태를 다시 수집
-        self._emit_selection_changed()
+        # 개별 체크박스 변경 시에만 시그널 발생
+        if not getattr(self, '_is_bulk_update', False):
+            self._emit_selection_changed()
     
-    def _emit_selection_changed(self):
+    def _emit_selection_changed(self, is_bulk_update: bool = False):
         """선택된 항목 변경 시그널 발생"""
         selected_items = []
+        selected_count = 0
         
         for row in range(self.rowCount()):
             checkbox_widget = self.cellWidget(row, 0)
@@ -243,6 +256,7 @@ class ShipmentRequestTable(QTableWidget):
                 checkbox = checkbox_widget.findChild(QCheckBox)
                 
                 if checkbox and checkbox.isChecked():
+                    selected_count += 1
                     try:
                         # 각 컬럼의 데이터 확인
                         id_item = self.item(row, 1)
@@ -285,12 +299,14 @@ class ShipmentRequestTable(QTableWidget):
                 new_state = Qt.Unchecked if header_item.checkState() == Qt.Checked else Qt.Checked
                 header_item.setCheckState(new_state)
                 # 모든 행의 체크박스 상태 변경
+                self._is_bulk_update = True
                 for row in range(self.rowCount()):
                     checkbox = self.cellWidget(row, 0).findChild(QCheckBox)
                     if checkbox:
                         checkbox.setChecked(new_state == Qt.Checked)
-                # 선택 상태 업데이트 및 시그널 발생
-                self._emit_selection_changed()
+                # 선택 상태 업데이트 및 시그널 발생 (한 번만)
+                self._emit_selection_changed(is_bulk_update=True)
+                self._is_bulk_update = False
     
     def _on_header_checkbox_changed(self, state):
         """헤더 체크박스 상태 변경 처리"""
@@ -325,21 +341,25 @@ class ShipmentRequestTable(QTableWidget):
 
     def _on_select_all_clicked(self):
         """전체 선택 버튼 클릭 처리"""
+        self._is_bulk_update = True
         for row in range(self.rowCount()):
             checkbox = self.cellWidget(row, 0).findChild(QCheckBox)
             if checkbox:
                 checkbox.setChecked(True)
-        # 선택 상태 업데이트 및 시그널 발생
-        self._emit_selection_changed()
+        # 선택 상태 업데이트 및 시그널 발생 (한 번만)
+        self._emit_selection_changed(is_bulk_update=True)
+        self._is_bulk_update = False
 
     def _on_clear_selection_clicked(self):
         """선택 해제 버튼 클릭 처리"""
+        self._is_bulk_update = True
         for row in range(self.rowCount()):
             checkbox = self.cellWidget(row, 0).findChild(QCheckBox)
             if checkbox:
                 checkbox.setChecked(False)
-        # 선택 상태 업데이트 및 시그널 발생
-        self._emit_selection_changed()
+        # 선택 상태 업데이트 및 시그널 발생 (한 번만)
+        self._emit_selection_changed(is_bulk_update=True)
+        self._is_bulk_update = False
 
     def _update_selection_label(self):
         """선택된 항목 수 업데이트"""
@@ -359,19 +379,19 @@ class ShipmentRequestTable(QTableWidget):
                             message_status_item = QTableWidgetItem(message_status)
                             
                             # 메시지 상태에 따른 색상 설정
-                            if message_status == "전송완료":
+                            if message_status == MessageStatus.SENT.value:
                                 message_status_item.setBackground(QColor(212, 237, 218))  # 연한 초록색
                                 message_status_item.setForeground(QColor(21, 87, 36))     # 진한 초록색
-                            elif message_status == "전송실패":
+                            elif message_status == MessageStatus.FAILED.value:
                                 message_status_item.setBackground(QColor(248, 215, 218))  # 연한 빨간색
                                 message_status_item.setForeground(QColor(114, 28, 36))    # 진한 빨간색
-                            elif message_status == "전송중":
+                            elif message_status == MessageStatus.IN_PROGRESS.value:
                                 message_status_item.setBackground(QColor(255, 243, 205))  # 연한 노란색
                                 message_status_item.setForeground(QColor(133, 100, 4))    # 진한 노란색
-                            elif message_status == "취소됨":
+                            elif message_status == MessageStatus.CANCELLED.value:
                                 message_status_item.setBackground(QColor(233, 236, 239))  # 연한 회색
                                 message_status_item.setForeground(QColor(73, 80, 87))     # 진한 회색
-                            elif message_status == "재시도대기":
+                            elif message_status == MessageStatus.RETRY_WAITING.value:
                                 message_status_item.setBackground(QColor(217, 237, 247))  # 연한 파란색
                                 message_status_item.setForeground(QColor(12, 84, 96))     # 진한 파란색
                             
@@ -384,3 +404,7 @@ class ShipmentRequestTable(QTableWidget):
                         continue
         except Exception as e:
             print(f"상태 업데이트 중 오류: {str(e)}") 
+
+    def _on_filter_changed(self, index):
+        # 상태 필터 변경 시 동작할 코드 (필요시 구현)
+        pass 

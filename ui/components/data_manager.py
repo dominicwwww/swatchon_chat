@@ -103,16 +103,33 @@ class DataManager(QObject):
             
             self.log(f"API에서 총 {len(items)}건의 데이터를 가져왔습니다.", LOG_INFO)
             
-            # 데이터 변환
+            # 데이터 변환 및 오늘 날짜까지 필터링
             purchase_products = []
+            today_date = date.today()
+            
             for item in items:
                 try:
                     product_data = self._map_api_response_to_product_data(item)
-                    product = PurchaseProduct(**product_data)
-                    purchase_products.append(product)
+                    
+                    # pickup_at이 오늘 날짜까지인 데이터만 필터링
+                    pickup_date = product_data['pickup_at']
+                    if isinstance(pickup_date, datetime):
+                        pickup_date = pickup_date.date()
+                    elif isinstance(pickup_date, str):
+                        try:
+                            pickup_date = datetime.strptime(pickup_date, '%Y-%m-%d').date()
+                        except ValueError:
+                            continue
+                    
+                    if pickup_date <= today_date:
+                        product = PurchaseProduct(**product_data)
+                        purchase_products.append(product)
+                    
                 except Exception as e:
                     self.log(f"데이터 변환 실패: {str(e)}", LOG_WARNING)
                     continue
+            
+            self.log(f"오늘 날짜까지의 데이터 {len(purchase_products)}건을 필터링했습니다.", LOG_INFO)
             
             # 기존 메시지 상태 보존
             purchase_products = self._preserve_existing_message_status(purchase_products)
@@ -377,45 +394,6 @@ class DataManager(QObject):
         except Exception as e:
             self.log(f"데이터 저장 중 오류: {str(e)}", LOG_ERROR)
             return None
-    
-    def load_saved_data(self, file_path: Optional[str] = None) -> bool:
-        """
-        저장된 데이터 파일 로드 (날짜별 캐시 파일 우선)
-        
-        Args:
-            file_path: 로드할 파일 경로 (None이면 최신 캐시 파일 자동 선택)
-            
-        Returns:
-            bool: 성공 여부
-        """
-        try:
-            if file_path is None:
-                # 오늘 날짜 캐시 파일이 있는지 먼저 확인
-                cached_file = self._get_today_cache_file()
-                if cached_file and os.path.exists(cached_file):
-                    return self._load_cached_data_with_status_preservation(cached_file)
-                
-                # 오늘 날짜 파일이 없으면 가장 최신 파일 찾기
-                pattern = os.path.join(self.data_dir, 'shipment_requests_*.json')
-                file_list = glob.glob(pattern)
-                if not file_list:
-                    # 백업으로 기존 패턴도 검색
-                    pattern = os.path.join(self.data_dir, f'{self.order_type.value.lower()}_data_*.json')
-                    file_list = glob.glob(pattern)
-                    
-                if not file_list:
-                    self.log("로드할 데이터 파일이 없습니다.", LOG_WARNING)
-                    return False
-                    
-                file_path = max(file_list, key=os.path.getmtime)
-            
-            # 직접 지정된 파일 또는 찾은 파일 로드
-            return self._load_cached_data_with_status_preservation(file_path)
-            
-        except Exception as e:
-            self.log(f"저장된 데이터 로드 중 오류: {str(e)}", LOG_ERROR)
-            self.error_occurred.emit(str(e))
-            return False
     
     def _purchase_product_to_dict(self, item: PurchaseProduct) -> Dict[str, Any]:
         """PurchaseProduct 객체를 딕셔너리로 변환"""

@@ -4,15 +4,32 @@
 from typing import List, Dict, Any, Optional, Callable
 from datetime import datetime
 from PySide6.QtWidgets import QMessageBox
-from PySide6.QtCore import QObject, Signal
+from PySide6.QtCore import QObject, Signal, QThread
 
-from core.types import OrderType, FboOperationType, SboOperationType, ShipmentStatus
+from core.types import OrderType, FboOperationType, SboOperationType, ShipmentStatus, MessageStatus
 from services.template.template_service import TemplateService
 from services.kakao.kakao_service import KakaoService
 from services.address_book_service import AddressBookService
 from core.constants import DELIVERY_METHODS, LOGISTICS_COMPANIES, API_FIELDS
 from ui.components.log_widget import LOG_INFO, LOG_DEBUG, LOG_WARNING, LOG_ERROR, LOG_SUCCESS
 
+
+class MessageSenderThread(QThread):
+    """메시지 전송을 위한 워커 스레드"""
+    finished = Signal(dict)  # 전송 완료 시그널
+    
+    def __init__(self, message_manager, update_status_callback):
+        super().__init__()
+        self.message_manager = message_manager
+        self.update_status_callback = update_status_callback
+    
+    def run(self):
+        """스레드 실행"""
+        try:
+            result = self.message_manager._send_messages_internal(self.update_status_callback)
+            self.finished.emit(result)
+        except Exception as e:
+            self.finished.emit({'success': False, 'error': str(e)})
 
 class MessageManager(QObject):
     """
@@ -89,8 +106,8 @@ class MessageManager(QObject):
                 seller_all_items = [item for item in all_data if item.store_name == seller_name]
                 
                 # 메시지 전송완료된 항목과 대기중인 항목 분류
-                sent_items = [item for item in seller_all_items if getattr(item, 'message_status', '대기중') == ShipmentStatus.SENT.value]
-                pending_items = [item for item in seller_all_items if getattr(item, 'message_status', '대기중') in [ShipmentStatus.PENDING.value, "대기중", ""]]
+                sent_items = [item for item in seller_all_items if getattr(item, 'message_status', '대기중') == MessageStatus.SENT.value]
+                pending_items = [item for item in seller_all_items if getattr(item, 'message_status', '대기중') in [MessageStatus.PENDING.value, "대기중", ""]]
                 
                 # 이미 전송된 항목이 있는 경우
                 if sent_items:
@@ -297,9 +314,38 @@ class MessageManager(QObject):
             self.log(f"메시지 미리보기 생성 중 오류: {str(e)}", LOG_ERROR)
             return False
     
-    def send_messages(self, update_status_callback: Optional[Callable] = None) -> Dict[str, Any]:
+    def send_messages(self, update_status_callback: Optional[Callable] = None) -> None:
         """
-        실제 메시지 전송
+        실제 메시지 전송 (비동기)
+        
+        Args:
+            update_status_callback: 상태 업데이트 콜백 함수
+        """
+        if not self._message_preview_data:
+            self.log("전송할 메시지 데이터가 없습니다. 먼저 미리보기를 생성해주세요.", LOG_WARNING)
+            return
+        
+        try:
+            self._is_sending = True
+            self._emergency_stop = False
+            
+            # 워커 스레드 생성 및 시작
+            self.sender_thread = MessageSenderThread(self, update_status_callback)
+            self.sender_thread.finished.connect(self._on_send_finished)
+            self.sender_thread.start()
+            
+        except Exception as e:
+            self.log(f"메시지 전송 시작 중 오류: {str(e)}", LOG_ERROR)
+            self._is_sending = False
+    
+    def _on_send_finished(self, result: Dict[str, Any]):
+        """전송 완료 처리"""
+        self._is_sending = False
+        self.message_sent.emit(result)
+    
+    def _send_messages_internal(self, update_status_callback: Optional[Callable] = None) -> Dict[str, Any]:
+        """
+        실제 메시지 전송 로직 (내부용)
         
         Args:
             update_status_callback: 상태 업데이트 콜백 함수
@@ -307,20 +353,13 @@ class MessageManager(QObject):
         Returns:
             Dict[str, Any]: 전송 결과
         """
-        if not self._message_preview_data:
-            self.log("전송할 메시지 데이터가 없습니다. 먼저 미리보기를 생성해주세요.", LOG_WARNING)
-            return {'success': False, 'error': '미리보기 데이터 없음'}
-        
         try:
-            self._is_sending = True
-            self._emergency_stop = False
-            
             self.log(f"=== 메시지 전송 시작 ({len(self._message_preview_data)}명의 판매자) ===", LOG_INFO)
             
             success_count = 0
             fail_count = 0
             sent_item_ids = []  # 전송 성공한 항목들의 ID 저장
-            cancelled_item_ids = []  # 취소된 항목들의 ID 저장
+            cancelled_item_ids = []
             
             for seller_name, data in self._message_preview_data.items():
                 # 긴급 정지 확인
@@ -343,7 +382,7 @@ class MessageManager(QObject):
                     # 해당 판매자의 항목들을 "전송중" 상태로 업데이트
                     seller_item_ids = [item.get('id') for item in seller_items if item.get('id')]
                     if update_status_callback:
-                        update_status_callback(seller_item_ids, ShipmentStatus.SENDING.value)
+                        update_status_callback(seller_item_ids, MessageStatus.SENDING.value)
                     
                     self.log(f"[{seller_name}] → [{chat_room_name}] 메시지 전송 중...", LOG_INFO)
                     
@@ -366,7 +405,7 @@ class MessageManager(QObject):
                         # 전송 실패한 항목들을 실패 상태로 업데이트
                         failed_item_ids = [item.get('id') for item in seller_items if item.get('id')]
                         if update_status_callback:
-                            update_status_callback(failed_item_ids, ShipmentStatus.FAILED.value)
+                            update_status_callback(failed_item_ids, MessageStatus.FAILED.value)
                         
                 except Exception as e:
                     self.log(f"❌ {seller_name} 메시지 전송 실패: {str(e)}", LOG_ERROR)
@@ -376,15 +415,15 @@ class MessageManager(QObject):
                     if 'seller_items' in locals():
                         failed_item_ids = [item.get('id') for item in seller_items if item.get('id')]
                         if update_status_callback:
-                            update_status_callback(failed_item_ids, ShipmentStatus.FAILED.value)
+                            update_status_callback(failed_item_ids, MessageStatus.FAILED.value)
             
             # 전송 성공한 항목들의 상태를 "전송완료"로 업데이트
             if sent_item_ids and update_status_callback:
-                update_status_callback(sent_item_ids, ShipmentStatus.SENT.value, True)
+                update_status_callback(sent_item_ids, MessageStatus.SENT.value, True)
             
             # 취소된 항목들의 상태를 "취소됨"으로 업데이트
             if cancelled_item_ids and update_status_callback:
-                update_status_callback(cancelled_item_ids, ShipmentStatus.CANCELLED.value)
+                update_status_callback(cancelled_item_ids, MessageStatus.CANCELLED.value)
             
             # 전송 결과 요약
             self.log(f"=== 전송 완료 ===", LOG_INFO)
@@ -393,7 +432,7 @@ class MessageManager(QObject):
             else:
                 self.log(f"성공: {success_count}건, 실패: {fail_count}건", LOG_INFO)
             
-            result = {
+            return {
                 'success': True,
                 'success_count': success_count,
                 'fail_count': fail_count,
@@ -402,17 +441,9 @@ class MessageManager(QObject):
                 'emergency_stop': self._emergency_stop
             }
             
-            # 시그널 발생
-            self.message_sent.emit(result)
-            
-            return result
-            
         except Exception as e:
             self.log(f"메시지 전송 중 오류: {str(e)}", LOG_ERROR)
             return {'success': False, 'error': str(e)}
-        finally:
-            # 전송 완료 후 상태 초기화
-            self._is_sending = False
     
     def emergency_stop(self):
         """긴급 정지 요청"""

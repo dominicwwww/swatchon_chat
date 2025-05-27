@@ -5,6 +5,7 @@ Pydantic 스키마 모듈
 from datetime import date, datetime
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field, validator
+from core.types import MessageStatus
 
 
 class ShipmentItem(BaseModel):
@@ -121,7 +122,7 @@ class PurchaseProduct(BaseModel):
     delivery_method: str = Field(..., description="배송 방법")
     logistics_company: Optional[str] = Field(None, description="물류 회사")
     status: str = Field("", description="발주 상태")
-    message_status: str = Field("대기중", description="메시지 전송 상태")
+    message_status: str = Field(MessageStatus.PENDING.value, description="메시지 전송 상태")
     processed_at: Optional[datetime] = Field(None, description="처리 시각")
 
     class Config:

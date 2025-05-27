@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, Signal, QSize
 from PySide6.QtGui import QFont, QColor
 
-from core.types import LogType
+from core.types import LogType, MessageStatus
 from ui.sections.base_section import BaseSection
 from ui.theme import get_theme
 
@@ -44,9 +44,9 @@ class PickupRequestSection(BaseSection):
         # 상태 필터
         self.status_filter = QComboBox()
         self.status_filter.addItem("모든 상태", "all")
-        self.status_filter.addItem("대기중", "pending")
-        self.status_filter.addItem("전송완료", "sent")
-        self.status_filter.addItem("전송실패", "failed")
+        self.status_filter.addItem("전송완료", MessageStatus.SENT.value)
+        self.status_filter.addItem("전송실패", MessageStatus.FAILED.value)
+        self.status_filter.setCurrentIndex(0)  # 초기값을 "모든 상태"로 설정
         self.status_filter.currentIndexChanged.connect(self._on_filter_changed)
         
         # 필터 레이아웃에 추가
@@ -137,9 +137,9 @@ class PickupRequestSection(BaseSection):
             status_item = self.table.item(row, 7)
             if item["status"] == "대기중":
                 status_item.setBackground(QColor(get_theme().get_color("warning")))
-            elif item["status"] == "전송완료":
+            elif item["status"] == MessageStatus.SENT.value:
                 status_item.setBackground(QColor(get_theme().get_color("success")))
-            elif item["status"] == "전송실패":
+            elif item["status"] == MessageStatus.FAILED.value:
                 status_item.setBackground(QColor(get_theme().get_color("error")))
         
         # 통계 업데이트

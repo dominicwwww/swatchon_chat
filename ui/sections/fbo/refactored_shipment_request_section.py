@@ -11,7 +11,7 @@ from PySide6.QtGui import QFont
 import os
 from datetime import datetime
 
-from core.types import OrderType, FboOperationType, ShipmentStatus
+from core.types import OrderType, FboOperationType, ShipmentStatus, MessageStatus
 from ui.sections.base_section import BaseSection
 from ui.theme import get_theme
 from ui.components.log_widget import LOG_INFO, LOG_DEBUG, LOG_WARNING, LOG_ERROR, LOG_SUCCESS

@@ -11,7 +11,7 @@ from PySide6.QtGui import QFont
 import os
 from datetime import datetime
 
-from core.types import OrderType, FboOperationType, ShipmentStatus
+from core.types import OrderType, FboOperationType, ShipmentStatus, MessageStatus
 from ui.sections.base_section import BaseSection
 from ui.theme import get_theme
 from ui.components.log_widget import LOG_INFO, LOG_DEBUG, LOG_WARNING, LOG_ERROR, LOG_SUCCESS
@@ -38,7 +38,6 @@ class ShipmentRequestSection(BaseSection):
         
         # 헤더 버튼 추가
         self.refresh_button = self.add_header_button("새로고침", self._on_refresh_clicked)
-        self.load_saved_button = self.add_header_button("저장 데이터 불러오기", self._on_load_saved_clicked)
         self.refresh_address_button = self.add_header_button("주소록 새로고침", self._on_refresh_address_clicked)
         self.preview_button = self.add_header_button("📋 메시지 미리보기", self._on_preview_clicked, primary=True)
         self.send_button = self.add_header_button("💌 메시지 전송", self._on_send_clicked)
@@ -257,7 +256,12 @@ class ShipmentRequestSection(BaseSection):
         self.preview_button.setEnabled(has_selection)
         
         if has_selection:
-            self.log(f"{len(complete_selected_items)}개 항목이 선택되었습니다.", LOG_INFO)
+            # 전체 선택인 경우 (테이블의 모든 행이 선택된 경우)
+            if len(complete_selected_items) == self.table.rowCount():
+                self.log(f"전체 {len(complete_selected_items)}개 항목이 선택되었습니다.", LOG_INFO)
+            else:
+                self.log(f"{len(complete_selected_items)}개 항목이 선택되었습니다.", LOG_INFO)
+            
             # 미리보기 상태 초기화
             self.send_button.setEnabled(False)
             self.preview_button.setText("📋 메시지 미리보기")
@@ -273,19 +277,6 @@ class ShipmentRequestSection(BaseSection):
         success = self.data_manager.load_data_from_api()
         if not success:
             QMessageBox.warning(self, "API 오류", "API에서 데이터를 받아오지 못했습니다.")
-    
-    def _on_load_saved_clicked(self):
-        """저장된 데이터 불러오기 버튼 클릭 이벤트"""
-        self.log("저장된 최신 출고 요청 데이터를 불러옵니다.", LOG_INFO)
-        success = self.data_manager.load_saved_data()
-        if success:
-            QTimer.singleShot(0, lambda: QMessageBox.information(
-                self, "불러오기 완료", "저장된 데이터를 성공적으로 불러왔습니다."
-            ))
-        else:
-            QTimer.singleShot(0, lambda: QMessageBox.warning(
-                self, "불러오기 실패", "불러올 데이터 파일이 없습니다."
-            ))
     
     def _on_refresh_address_clicked(self):
         """주소록 새로고침 버튼 클릭 이벤트"""
