@@ -272,13 +272,33 @@ class MessageManager(QObject):
                     for field_key, field_name in API_FIELDS.items():
                         if field_name not in message_data:
                             message_data[field_name] = seller_items[0].get(field_name, "")
-                
-                    # 템플릿 서비스를 사용하여 메시지 생성
-                    message = self.template_service.render_message(
-                        self.order_type,
-                        self.operation_type,
-                        message_data
-                    )
+                    
+                    # 조건부 템플릿 적용
+                    template = self.template_service.load_template(self.order_type, self.operation_type)
+                    if template and template.get("conditions"):
+                        for condition in template.get("conditions", []):
+                            if self.template_service.evaluate_condition(message_data, condition):
+                                # 조건이 만족되면 해당 템플릿 사용
+                                message = condition.get("template", "")
+                                if message:
+                                    # 템플릿 변수 치환
+                                    for k, v in message_data.items():
+                                        message = message.replace(f"{{{k}}}", str(v))
+                                    break
+                        else:
+                            # 조건이 만족되지 않으면 기본 템플릿 사용
+                            message = self.template_service.render_message(
+                                self.order_type,
+                                self.operation_type,
+                                message_data
+                            )
+                    else:
+                        # 조건부 템플릿이 없으면 기본 템플릿 사용
+                        message = self.template_service.render_message(
+                            self.order_type,
+                            self.operation_type,
+                            message_data
+                        )
                 
                     if message:
                         # 주소록에서 실제 채팅방 이름 조회

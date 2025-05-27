@@ -202,7 +202,7 @@ class TemplateService:
                     field = condition["field"]
                     operator = condition["operator"]
                     value = condition["value"]
-                    condition_content = condition["content"]
+                    condition_content = condition.get("template", "")
                     if self._evaluate_condition(data, field, operator, value):
                         content = condition_content
                         break
@@ -297,9 +297,16 @@ class TemplateService:
         try:
             if field not in data:
                 return False
-                
             field_value = data[field]
-            
+            # {today} 지원
+            if isinstance(value, str) and value.strip() == "{today}":
+                value = datetime.now().strftime('%Y-%m-%d')
+            # pickup_at이 datetime 또는 ISO 문자열이면 YYYY-MM-DD로 변환
+            if field == "pickup_at":
+                if isinstance(field_value, datetime):
+                    field_value = field_value.strftime('%Y-%m-%d')
+                elif isinstance(field_value, str) and "T" in field_value:
+                    field_value = field_value.split("T")[0]
             # 연산자에 따른 조건 확인
             if operator == "==":
                 return field_value == value
@@ -321,9 +328,7 @@ class TemplateService:
                 return str(value) in str(field_value)
             elif operator == "not contains":
                 return str(value) not in str(field_value)
-            
             return False
-            
         except Exception as e:
             self.logger.error(f"조건 평가 중 오류: {str(e)}")
             return False
@@ -430,4 +435,75 @@ class TemplateService:
             
         except Exception as e:
             self.logger.error(f"API 데이터 가져오기 실패: {str(e)}")
-            return None 
+            return None
+
+    def evaluate_condition(self, data: dict, condition: dict) -> bool:
+        """
+        조건부 템플릿의 조건을 평가합니다.
+        Args:
+            data: 메시지 데이터(dict)
+            condition: {"field": ..., "operator": ..., "value": ...}
+        Returns:
+            bool: 조건 만족 여부
+        """
+        from datetime import datetime
+        field = condition.get("field")
+        operator = condition.get("operator")
+        value = condition.get("value")
+
+        # {today} 지원
+        if isinstance(value, str) and value.strip() == "{today}":
+            value = datetime.now().strftime('%Y-%m-%d')
+        if field == "pickup_at":
+            field_value = data.get(field, "")
+            if isinstance(field_value, str) and "T" in field_value:
+                field_value = field_value.split("T")[0]
+        else:
+            field_value = data.get(field, "")
+
+        # 숫자 비교 연산자 처리
+        def try_cast(val):
+            try:
+                return float(val)
+            except (ValueError, TypeError):
+                return val
+
+        if operator in (">", "<", ">=", "<="):
+            left = try_cast(field_value)
+            right = try_cast(value)
+            # 둘 다 숫자면 숫자 비교
+            if isinstance(left, (int, float)) and isinstance(right, (int, float)):
+                if operator == ">":
+                    return left > right
+                elif operator == "<":
+                    return left < right
+                elif operator == ">=":
+                    return left >= right
+                elif operator == "<=":
+                    return left <= right
+            else:
+                # 둘 중 하나라도 숫자가 아니면 문자열 비교 fallback
+                left = str(field_value)
+                right = str(value)
+                if operator == ">":
+                    return left > right
+                elif operator == "<":
+                    return left < right
+                elif operator == ">=":
+                    return left >= right
+                elif operator == "<=":
+                    return left <= right
+        # 나머지 연산자
+        if operator == "==":
+            return field_value == value
+        elif operator == "!=":
+            return field_value != value
+        elif operator == "in":
+            return value in field_value
+        elif operator == "not in":
+            return value not in field_value
+        elif operator == "contains":
+            return str(value) in str(field_value)
+        elif operator == "not contains":
+            return str(value) not in str(field_value)
+        return False 

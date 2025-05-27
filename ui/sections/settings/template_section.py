@@ -227,7 +227,7 @@ class TemplateSection(BaseSection):
         # 조건 테이블
         self.conditions_table = QTableWidget()
         self.conditions_table.setColumnCount(4)
-        self.conditions_table.setHorizontalHeaderLabels(["필드", "연산자", "값", "템플릿"])
+        self.conditions_table.setHorizontalHeaderLabels(["필드", "연산자", "값", "템플릿 내용"])
         
         # 테이블 헤더 설정
         header = self.conditions_table.horizontalHeader()
