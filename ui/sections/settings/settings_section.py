@@ -15,7 +15,7 @@ from core.types import LogType, ThemeMode, SectionType
 from ui.sections.base_section import BaseSection
 from ui.theme import get_theme
 from core.config import ConfigManager
-from core.constants import ConfigKey, SpreadsheetConfigKey, LogLevel, SECTION_SPREADSHEET_MAPPING
+from core.constants import ConfigKey, SpreadsheetConfigKey, SECTION_SPREADSHEET_MAPPING
 from ui.components.log_widget import LOG_INFO, LOG_DEBUG, LOG_WARNING, LOG_ERROR, LOG_SUCCESS
 
 class SettingsSection(BaseSection):
@@ -65,13 +65,13 @@ class SettingsSection(BaseSection):
         
         # 로그 설정
         self.log_level_combo = QComboBox()
-        self.log_level_combo.addItem("디버그", LogLevel.DEBUG.value)
-        self.log_level_combo.addItem("정보", LogLevel.INFO.value)
-        self.log_level_combo.addItem("경고", LogLevel.WARNING.value)
-        self.log_level_combo.addItem("오류", LogLevel.ERROR.value)
+        self.log_level_combo.addItem("디버그", LogType.DEBUG.value)
+        self.log_level_combo.addItem("정보", LogType.INFO.value)
+        self.log_level_combo.addItem("경고", LogType.WARNING.value)
+        self.log_level_combo.addItem("오류", LogType.ERROR.value)
         
         # 현재 로그 레벨 설정
-        current_log_level = self.config_manager.get(ConfigKey.LOG_LEVEL, LogLevel.INFO.value)
+        current_log_level = self.config_manager.get(ConfigKey.LOG_LEVEL, LogType.INFO.value)
         for i in range(self.log_level_combo.count()):
             if self.log_level_combo.itemData(i) == current_log_level:
                 self.log_level_combo.setCurrentIndex(i)

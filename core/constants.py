@@ -1,7 +1,7 @@
 """
 공통 상수 정의 모듈
 """
-from enum import Enum, auto
+from enum import Enum
 
 # 앱 정보
 APP_NAME = "SwatchOn 카카오톡 자동화"
@@ -36,6 +36,27 @@ LOG_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 # 메시지 관련
 DEFAULT_HEADER = "[SwatchOn]"
 DEFAULT_FOOTER = "감사합니다.\nSwatchOn 팀 드림."
+
+# API 필드명 상수
+API_FIELDS = {
+    "ID": "id",
+    "STORE_NAME": "store_name",
+    "STORE_ADDRESS": "store_address",
+    "STORE_DDM_ADDRESS": "store_ddm_address",
+    "QUALITY_NAME": "quality_name",
+    "COLOR_NUMBER": "color_number",
+    "COLOR_CODE": "color_code",
+    "QUANTITY": "quantity",
+    "PURCHASE_CODE": "purchase_code",
+    "PICKUP_AT": "pickup_at",
+    "DELIVERY_METHOD": "delivery_method",
+    "LOGISTICS_COMPANY": "logistics_company",
+    "STATUS": "status",  # 발주 상태
+    "MESSAGE_STATUS": "message_status"  # 메시지 전송 상태
+}
+
+# 주문 상세 정보 기본 형식
+DEFAULT_ORDER_DETAILS_FORMAT = "[{quality_name}] | #{color_number} | {quantity}yd | {pickup_at} | {delivery_method}-{logistics_company}"
 
 # 설정 키 이름 상수 - 일반 설정
 class ConfigKey(Enum):
@@ -94,13 +115,6 @@ class SpreadsheetConfigKey(Enum):
     SBO_PICKUP_REQUEST_URL = "sbo_pickup_request_spreadsheet_url"
     SBO_PICKUP_REQUEST_SHEET = "sbo_pickup_request_sheet_name"
 
-# 로그 레벨
-class LogLevel(Enum):
-    DEBUG = "DEBUG"
-    INFO = "INFO"
-    WARNING = "WARNING"
-    ERROR = "ERROR"
-
 # 설정 매핑: SectionType과 SpreadsheetConfigKey 매핑
 SECTION_SPREADSHEET_MAPPING = {
     "fbo_shipment_request": {
@@ -149,17 +163,53 @@ SECTION_ICON_PATHS = {
 
 # API 관련 상수
 API_BASE_URL = "https://admin.swatchon.me/api"
+# API 키는 환경변수나 설정파일에서 로드하도록 변경 권장
 API_KEY = "CkhbWmgJV51nxuTsiKiHmel8QUuoHnxUtjSQ812FxEexVfen"
 
 # API 엔드포인트
 API_ENDPOINTS = {
     "purchase_products": "/purchase_products",
     "shipment_requests": "/shipment_requests",
-    "shipment_confirmations": "/shipment_confirmations"
+    "shipment_confirmations": "/shipment_confirmations",
+    "pickup_requests": "/pickup_requests"
 }
 
 # API 헤더
 API_HEADERS = {
     "X-Api-Key": API_KEY,
     "Content-Type": "application/json"
+}
+
+# 배송 방법 매핑
+DELIVERY_METHODS = {
+   "quick": "동대문 픽업",
+   "logistics": "판매자 발송"
+}
+
+# 물류 회사 매핑
+LOGISTICS_COMPANIES = {
+    "kk": "경기택배",
+    "is": "일신택배",
+    "kd": "경동택배",
+    "quick_truck": "퀵서비스",
+    "None": "3 p.m.",  # 동대문 픽업의 경우
+    "null": "3 p.m."   # null 값도 3 p.m.으로 처리
+}
+
+# 테이블 컬럼명 매핑
+TABLE_COLUMN_NAMES = {
+    "id": "ID",
+    "store_name": "판매자",
+    "store_ddm_address": "동대문주소",
+    "quality_name": "퀄리티",
+    "color_number": "컬러순서",
+    "color_code": "컬러코드",
+    "quantity": "수량(yd)",
+    "purchase_code": "발주번호",
+    "pickup_at": "출고일",
+    "delivery_method": "배송방법",
+    "logistics_company": "택배사",
+    "status": "발주상태",  # API에서 가져오는 발주 상태
+    "message_status": "메시지상태",  # 우리가 관리하는 메시지 상태
+    "processed_at": "처리시각"
 } 

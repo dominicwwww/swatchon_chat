@@ -7,12 +7,14 @@ from PySide6.QtWidgets import (
     QCheckBox, QLabel, QVBoxLayout, QComboBox, QPushButton, QFrame
 )
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QColor, QPixmap
+from PySide6.QtGui import QColor
 from datetime import datetime
+from functools import partial
 
 from ui.theme import get_theme
 from ui.components.log_widget import LOG_INFO, LOG_WARNING, LOG_ERROR
 from core.schemas import PurchaseProduct
+from core.constants import DELIVERY_METHODS, LOGISTICS_COMPANIES, TABLE_COLUMN_NAMES, API_FIELDS
 
 class ShipmentRequestTable(QTableWidget):
     """FBO 출고 요청 테이블 컴포넌트"""
@@ -48,6 +50,31 @@ class ShipmentRequestTable(QTableWidget):
         self.photo_checkbox.stateChanged.connect(self._on_photo_checkbox_changed)
         self.top_layout.addWidget(self.photo_checkbox)
         
+        # 선택된 항목 수 표시 라벨
+        self.selection_label = QLabel("선택된 항목: 0개")
+        self.selection_label.setStyleSheet("""
+            QLabel {
+                color: #007bff;
+                font-weight: bold;
+                padding: 4px 8px;
+                background-color: #e3f2fd;
+                border-radius: 4px;
+                border: 1px solid #bbdefb;
+            }
+        """)
+        self.top_layout.addWidget(self.selection_label)
+        
+        # 전체 선택/해제 버튼
+        self.select_all_button = QPushButton("전체 선택")
+        self.select_all_button.clicked.connect(self._on_select_all_clicked)
+        self.select_all_button.setMaximumWidth(80)
+        self.top_layout.addWidget(self.select_all_button)
+        
+        self.clear_selection_button = QPushButton("선택 해제")
+        self.clear_selection_button.clicked.connect(self._on_clear_selection_clicked)
+        self.clear_selection_button.setMaximumWidth(80)
+        self.top_layout.addWidget(self.clear_selection_button)
+        
         # 레이아웃 정렬
         self.top_layout.addStretch()
         
@@ -61,16 +88,28 @@ class ShipmentRequestTable(QTableWidget):
         self.setEditTriggers(QTableWidget.NoEditTriggers)
         self.setSortingEnabled(True)  # 헤더 클릭 정렬 활성화
         
-        # 컬럼 정의
-        self.setColumnCount(10)
+        # 컬럼 정의 - 발주 상태 컬럼 제거
+        self.setColumnCount(14)  # 컬럼 수 감소 (15 → 14)
         self.setHorizontalHeaderLabels([
-            "", "ID", "스토어명", "동대문주소", "품질명", 
-            "컬러번호", "컬러코드", "수량", "구매코드", "픽업일시"
+            "",  # 체크박스 컬럼
+            TABLE_COLUMN_NAMES[API_FIELDS["ID"]],
+            TABLE_COLUMN_NAMES[API_FIELDS["STORE_NAME"]],
+            TABLE_COLUMN_NAMES[API_FIELDS["STORE_DDM_ADDRESS"]],
+            TABLE_COLUMN_NAMES[API_FIELDS["QUALITY_NAME"]],
+            TABLE_COLUMN_NAMES[API_FIELDS["COLOR_NUMBER"]],
+            TABLE_COLUMN_NAMES[API_FIELDS["COLOR_CODE"]],
+            TABLE_COLUMN_NAMES[API_FIELDS["QUANTITY"]],
+            TABLE_COLUMN_NAMES[API_FIELDS["PURCHASE_CODE"]],
+            TABLE_COLUMN_NAMES[API_FIELDS["PICKUP_AT"]],
+            TABLE_COLUMN_NAMES[API_FIELDS["DELIVERY_METHOD"]],
+            TABLE_COLUMN_NAMES[API_FIELDS["LOGISTICS_COMPANY"]],
+            TABLE_COLUMN_NAMES[API_FIELDS["MESSAGE_STATUS"]],  # 메시지 상태만 표시
+            TABLE_COLUMN_NAMES["processed_at"]  # 처리시각
         ])
         
         # 컬럼 너비 설정
         header = self.horizontalHeader()
-        for i in range(10):
+        for i in range(14):  # 컬럼 수 감소 (15 → 14)
             header.setSectionResizeMode(i, QHeaderView.ResizeToContents)
             
         # 헤더 클릭 이벤트 연결
@@ -92,14 +131,11 @@ class ShipmentRequestTable(QTableWidget):
     def update_data(self, data: List[PurchaseProduct]):
         """테이블 데이터 업데이트"""
         try:
-            print(f"[update_data] 테이블 데이터 업데이트 시작: {len(data)}건")
-            
             # 현재 데이터 저장
             self._current_data = data
             
             self.setRowCount(0)
             if not data:
-                print("[update_data] 데이터 없음")
                 return
                 
             total_rows = len(data)
@@ -107,13 +143,11 @@ class ShipmentRequestTable(QTableWidget):
             
             for row_idx, item in enumerate(data):
                 try:
-                    print(f"[update_data] {row_idx+1}/{total_rows}행 처리 시작")
-                    
                     # 체크박스
                     checkbox = QCheckBox()
-                    checkbox.stateChanged.connect(
-                        lambda state, r=row_idx: self._on_checkbox_changed(state, r)
-                    )
+                    # 체크박스에 행 번호 저장
+                    checkbox.setProperty("row_index", row_idx)
+                    checkbox.stateChanged.connect(self._on_any_checkbox_changed)
                     self.setCellWidget(row_idx, 0, self._create_checkbox_widget(checkbox))
                     
                     # ID
@@ -143,31 +177,94 @@ class ShipmentRequestTable(QTableWidget):
                     self.setItem(row_idx, 8, QTableWidgetItem(item.purchase_code))
                     
                     # 픽업일시
-                    pickup_date = item.pickup_at.strftime("%Y-%m-%d %H:%M")
+                    pickup_date = item.pickup_at.strftime("%Y-%m-%d")
                     self.setItem(row_idx, 9, QTableWidgetItem(pickup_date))
                     
-                    print(f"[update_data] {row_idx+1}/{total_rows}행 처리 완료")
+                    # 배송방법
+                    delivery_method = DELIVERY_METHODS.get(item.delivery_method, item.delivery_method)
+                    self.setItem(row_idx, 10, QTableWidgetItem(delivery_method))
+                    
+                    # 물류회사
+                    logistics_company = LOGISTICS_COMPANIES.get(item.logistics_company, item.logistics_company) if item.logistics_company else ""
+                    self.setItem(row_idx, 11, QTableWidgetItem(logistics_company))
+                    
+                    # 메시지 상태 (우리가 관리하는 상태)
+                    message_status_text = getattr(item, 'message_status', '대기중') if hasattr(item, 'message_status') else '대기중'
+                    message_status_item = QTableWidgetItem(message_status_text)
+                    
+                    # 메시지 상태에 따른 색상 설정
+                    if message_status_text == "전송완료":
+                        message_status_item.setBackground(QColor(212, 237, 218))  # 연한 초록색
+                        message_status_item.setForeground(QColor(21, 87, 36))     # 진한 초록색
+                    elif message_status_text == "전송실패":
+                        message_status_item.setBackground(QColor(248, 215, 218))  # 연한 빨간색
+                        message_status_item.setForeground(QColor(114, 28, 36))    # 진한 빨간색
+                    elif message_status_text == "전송중":
+                        message_status_item.setBackground(QColor(255, 243, 205))  # 연한 노란색
+                        message_status_item.setForeground(QColor(133, 100, 4))    # 진한 노란색
+                    elif message_status_text == "취소됨":
+                        message_status_item.setBackground(QColor(233, 236, 239))  # 연한 회색
+                        message_status_item.setForeground(QColor(73, 80, 87))     # 진한 회색
+                    elif message_status_text == "재시도대기":
+                        message_status_item.setBackground(QColor(217, 237, 247))  # 연한 파란색
+                        message_status_item.setForeground(QColor(12, 84, 96))     # 진한 파란색
+                    
+                    self.setItem(row_idx, 12, message_status_item)
+                    
+                    # 처리시각
+                    if hasattr(item, 'processed_at') and item.processed_at:
+                        processed_at = item.processed_at.strftime("%Y-%m-%d %H:%M:%S")
+                    else:
+                        processed_at = ""
+                    self.setItem(row_idx, 13, QTableWidgetItem(processed_at))
+                    
                 except Exception as row_error:
-                    print(f"[update_data] {row_idx+1}행 처리 중 오류: {str(row_error)}")
+                    # 행 처리 중 오류 발생 시 빈 항목으로 채우기
                     for col in range(self.columnCount()):
                         self.setItem(row_idx, col, QTableWidgetItem(""))
             
-            print(f"[update_data] {total_rows}행까지 처리 완료")
         except Exception as e:
             print(f"테이블 업데이트 중 오류: {str(e)}")
             self.setRowCount(0)
     
-    def _on_checkbox_changed(self, state: int, row: int):
+    def _on_any_checkbox_changed(self, state: int):
         """체크박스 상태 변경 이벤트"""
+        # 모든 체크박스 상태를 다시 수집
+        self._emit_selection_changed()
+    
+    def _emit_selection_changed(self):
+        """선택된 항목 변경 시그널 발생"""
         selected_items = []
+        
         for row in range(self.rowCount()):
-            checkbox = self.cellWidget(row, 0).findChild(QCheckBox)
-            if checkbox and checkbox.isChecked():
-                selected_items.append({
-                    "id": int(self.item(row, 1).text()),
-                    "store_name": self.item(row, 2).text(),
-                    "purchase_code": self.item(row, 8).text()
-                })
+            checkbox_widget = self.cellWidget(row, 0)
+            
+            if checkbox_widget:
+                checkbox = checkbox_widget.findChild(QCheckBox)
+                
+                if checkbox and checkbox.isChecked():
+                    try:
+                        # 각 컬럼의 데이터 확인
+                        id_item = self.item(row, 1)
+                        store_item = self.item(row, 2)
+                        purchase_item = self.item(row, 8)
+                        
+                        if id_item and store_item and purchase_item:
+                            selected_item = {
+                                "id": int(id_item.text()),
+                                "store_name": store_item.text(),
+                                "purchase_code": purchase_item.text()
+                            }
+                            selected_items.append(selected_item)
+                            
+                    except (ValueError, AttributeError) as e:
+                        print(f"행 {row} 데이터 수집 중 오류: {e}")
+                        continue
+        
+        # 선택된 항목 수 업데이트
+        self._update_selection_label()
+        
+        # 시그널 발생
         self.selection_changed.emit(selected_items)
     
     def _create_checkbox_widget(self, checkbox):
@@ -192,6 +289,8 @@ class ShipmentRequestTable(QTableWidget):
                     checkbox = self.cellWidget(row, 0).findChild(QCheckBox)
                     if checkbox:
                         checkbox.setChecked(new_state == Qt.Checked)
+                # 선택 상태 업데이트 및 시그널 발생
+                self._emit_selection_changed()
     
     def _on_header_checkbox_changed(self, state):
         """헤더 체크박스 상태 변경 처리"""
@@ -199,6 +298,8 @@ class ShipmentRequestTable(QTableWidget):
             checkbox = self.cellWidget(row, 0).findChild(QCheckBox)
             if checkbox:
                 checkbox.setChecked(state == Qt.Checked)
+        # 선택 상태 업데이트 및 시그널 발생
+        self._emit_selection_changed()
     
     def _on_header_clicked(self, column):
         """헤더 클릭 시 정렬 처리"""
@@ -220,4 +321,66 @@ class ShipmentRequestTable(QTableWidget):
         self.load_photo = (state == Qt.Checked)
         # 현재 데이터로 테이블 업데이트
         if hasattr(self, '_current_data'):
-            self.update_data(self._current_data) 
+            self.update_data(self._current_data)
+
+    def _on_select_all_clicked(self):
+        """전체 선택 버튼 클릭 처리"""
+        for row in range(self.rowCount()):
+            checkbox = self.cellWidget(row, 0).findChild(QCheckBox)
+            if checkbox:
+                checkbox.setChecked(True)
+        # 선택 상태 업데이트 및 시그널 발생
+        self._emit_selection_changed()
+
+    def _on_clear_selection_clicked(self):
+        """선택 해제 버튼 클릭 처리"""
+        for row in range(self.rowCount()):
+            checkbox = self.cellWidget(row, 0).findChild(QCheckBox)
+            if checkbox:
+                checkbox.setChecked(False)
+        # 선택 상태 업데이트 및 시그널 발생
+        self._emit_selection_changed()
+
+    def _update_selection_label(self):
+        """선택된 항목 수 업데이트"""
+        selected_count = sum(1 for row in range(self.rowCount()) if self.cellWidget(row, 0).findChild(QCheckBox).isChecked())
+        self.selection_label.setText(f"선택된 항목: {selected_count}개")
+
+    def update_status(self, item_ids: List[int], message_status: str, processed_at: str = None):
+        """특정 항목들의 메시지 상태와 처리시각만 업데이트"""
+        try:
+            for row in range(self.rowCount()):
+                id_item = self.item(row, 1)  # ID 컬럼
+                if id_item:
+                    try:
+                        row_id = int(id_item.text())
+                        if row_id in item_ids:
+                            # 메시지 상태 업데이트 (컬럼 12)
+                            message_status_item = QTableWidgetItem(message_status)
+                            
+                            # 메시지 상태에 따른 색상 설정
+                            if message_status == "전송완료":
+                                message_status_item.setBackground(QColor(212, 237, 218))  # 연한 초록색
+                                message_status_item.setForeground(QColor(21, 87, 36))     # 진한 초록색
+                            elif message_status == "전송실패":
+                                message_status_item.setBackground(QColor(248, 215, 218))  # 연한 빨간색
+                                message_status_item.setForeground(QColor(114, 28, 36))    # 진한 빨간색
+                            elif message_status == "전송중":
+                                message_status_item.setBackground(QColor(255, 243, 205))  # 연한 노란색
+                                message_status_item.setForeground(QColor(133, 100, 4))    # 진한 노란색
+                            elif message_status == "취소됨":
+                                message_status_item.setBackground(QColor(233, 236, 239))  # 연한 회색
+                                message_status_item.setForeground(QColor(73, 80, 87))     # 진한 회색
+                            elif message_status == "재시도대기":
+                                message_status_item.setBackground(QColor(217, 237, 247))  # 연한 파란색
+                                message_status_item.setForeground(QColor(12, 84, 96))     # 진한 파란색
+                            
+                            self.setItem(row, 12, message_status_item)
+                            
+                            # 처리시각 업데이트 (컬럼 13)
+                            if processed_at:
+                                self.setItem(row, 13, QTableWidgetItem(processed_at))
+                    except ValueError:
+                        continue
+        except Exception as e:
+            print(f"상태 업데이트 중 오류: {str(e)}") 

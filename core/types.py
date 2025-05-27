@@ -1,4 +1,4 @@
-from enum import Enum, auto
+from enum import Enum
 from typing import Callable, Dict, List, Optional, Any, Union, TypedDict
 
 # 로그 함수 타입
@@ -19,6 +19,15 @@ class FboOperationType(Enum):
 class SboOperationType(Enum):
     PO = "po"                     # 스와치 발주
     PICKUP_REQUEST = "pickup_request"  # 스와치 픽업 요청
+
+# 출고 요청 상태 열거형
+class ShipmentStatus(Enum):
+    PENDING = "대기중"           # 아직 전송하지 않음
+    SENDING = "전송중"           # 현재 전송 중
+    SENT = "전송완료"            # 전송 성공
+    FAILED = "전송실패"          # 전송 실패
+    CANCELLED = "취소됨"         # 사용자가 취소
+    RETRY = "재시도대기"         # 재시도 대기 중
 
 # 메시지 상태 열거형
 class MessageStatus(Enum):
@@ -43,13 +52,13 @@ class ThemeMode(Enum):
     DARK = "dark"
     SYSTEM = "system"  # 시스템 설정 따름
 
-# 로그 타입
+# 로그 타입 (LogLevel과 통합 예정)
 class LogType(Enum):
-    INFO = "info"
-    WARNING = "warning"
-    ERROR = "error"
-    SUCCESS = "success"
-    DEBUG = "debug"
+    DEBUG = "DEBUG"
+    INFO = "INFO"
+    WARNING = "WARNING"
+    ERROR = "ERROR"
+    SUCCESS = "SUCCESS"
 
 # 사이드바 아이템 타입
 class SidebarItemType(Enum):
@@ -65,10 +74,11 @@ SellerList = List[str]
 # 상세 타입 정의
 class MessageData(TypedDict):
     """메시지 데이터 타입"""
-    seller_name: str
-    items: List[Dict[str, Any]]
-    total_count: int
-    message_type: str
+    store_name: str
+    order_details: str
+    pickup_at: str
+    total_orders: int
+    total_products: int
 
 # UI 컴포넌트 스타일 타입
 class StyleData(TypedDict, total=False):

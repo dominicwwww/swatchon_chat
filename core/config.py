@@ -23,111 +23,95 @@ class ConfigManager:
             cls._instance = super(ConfigManager, cls).__new__(cls)
         return cls._instance
     
-    def __init__(self):
-        """초기화 메서드 - 한 번만 호출되도록 함"""
+    def __init__(self, config_path: str = None):
+        """
+        초기화
+        
+        Args:
+            config_path: 설정 파일 경로 (None인 경우 기본 경로 사용)
+        """
         if ConfigManager._initialized:
             return
         
-        self._config_path = None
         self.logger = get_logger(__name__)
-        self._config = {}
         
-        # 설정 파일 경로 결정
-        self._determine_config_path()
+        # 설정 파일 경로 설정
+        if config_path is None:
+            exe_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            config_path = os.path.join(exe_dir, 'config.json')
         
-        # 설정 파일 로드
-        self._load_config()
+        self.config_path = config_path
+        self.logger.info(f"설정 파일 경로 설정: {self.config_path}")
+        
+        # 설정 데이터 로드
+        self.config = self._load_config()
         
         ConfigManager._initialized = True
     
-    def _determine_config_path(self):
-        """설정 파일 경로 결정 (한 번만 호출)"""
+    def _load_config(self) -> Dict[str, Any]:
+        """
+        설정 파일 로드
+        
+        Returns:
+            Dict[str, Any]: 설정 데이터
+        """
         try:
-            # 현재 작업 디렉토리를 기준으로 설정 파일 경로 설정
-            current_dir = os.getcwd()
-            config_path = os.path.join(current_dir, DEFAULT_CONFIG_PATH)
-            
-            # 항상 현재 작업 디렉토리의 config.json 사용
-            self._config_path = config_path
-            print(f"설정 파일 경로 설정: {config_path}")
-            
-            # 설정 파일이 없으면 빈 파일 생성
-            if not os.path.exists(config_path):
-                with open(config_path, 'w', encoding='utf-8') as f:
-                    f.write('{}')
-                print(f"설정 파일이 없어 빈 파일 생성: {config_path}")
-        except Exception as e:
-            # 오류 발생 시 현재 디렉토리에 config.json 사용
-            self.logger.error(f"설정 파일 경로 결정 중 오류: {str(e)}")
-            self._config_path = "config.json"
-            print(f"오류로 인해 현재 디렉토리의 설정 파일 사용: {self._config_path}")
-    
-    def _load_config(self):
-        """설정 파일 로드"""
-        try:
-            # 설정 파일이 있으면 로드
-            if os.path.exists(self._config_path):
-                with open(self._config_path, 'r', encoding='utf-8') as f:
-                    self._config = json.load(f)
-            else:
-                # 설정 파일이 없으면 기본 설정 파일 생성
-                self._create_default_config()
+            if os.path.exists(self.config_path):
+                with open(self.config_path, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            return {}
         except Exception as e:
             self.logger.error(f"설정 파일 로드 실패: {str(e)}")
-            self._config = {}
+            return {}
     
-    def _create_default_config(self):
-        """기본 설정 파일 생성"""
-        try:
-            # 실행 파일 경로의 기본 설정 파일 경로
-            exe_dir = os.path.dirname(os.path.abspath(__file__))
-            app_dir = os.path.dirname(os.path.dirname(exe_dir))
-            default_config_path = os.path.join(app_dir, DEFAULT_CONFIG_PATH)
-            
-            # 기본 설정 파일이 있으면 로드
-            if os.path.exists(default_config_path):
-                with open(default_config_path, 'r', encoding='utf-8') as f:
-                    self._config = json.load(f)
-                
-                # 설정 파일 저장
-                self._save_config()
-            else:
-                # 기본 설정 파일이 없으면 빈 설정 사용
-                self._config = {}
-                
-        except Exception as e:
-            self.logger.error(f"기본 설정 파일 생성 실패: {str(e)}")
-            self._config = {}
-    
-    def get(self, key: Union[str, ConfigKey, SpreadsheetConfigKey], default: Any = None) -> Any:
-        """설정 값 가져오기"""
-        if isinstance(key, (ConfigKey, SpreadsheetConfigKey)):
-            key = key.value
-        return self._config.get(key, default)
-    
-    def set(self, key: Union[str, ConfigKey, SpreadsheetConfigKey], value: Any) -> None:
-        """설정 값 설정하기"""
-        # 현재 저장 중이면 설정만 업데이트하고 저장은 하지 않음
-        if ConfigManager._is_saving:
-            print(f"이미 저장 중입니다. 설정만 업데이트: {key}")
-            if isinstance(key, (ConfigKey, SpreadsheetConfigKey)):
-                key = key.value
-            self._config[key] = value
-            return
-            
-        # 설정 값 변경
-        if isinstance(key, (ConfigKey, SpreadsheetConfigKey)):
-            key = key.value
+    def get(self, key: str, default: Any = None) -> Any:
+        """
+        설정 값 가져오기
         
-        # 값이 실제로 변경되었는지 확인
-        old_value = self._config.get(key)
-        if old_value == value:
-            print(f"설정 값이 변경되지 않았습니다: {key}={value}")
-            return
+        Args:
+            key: 설정 키
+            default: 기본값
             
-        # 값 설정 및 저장
-        self._config[key] = value
-        self._save_config()
+        Returns:
+            Any: 설정 값
+        """
+        return self.config.get(key, default)
+    
+    def set(self, key: str, value: Any) -> None:
+        """
+        설정 값 설정
+        
+        Args:
+            key: 설정 키
+            value: 설정 값
+        """
+        if self.config.get(key) != value:
+            self.config[key] = value
+            self.logger.info(f"설정 값이 변경되었습니다: {key}={value}")
+        else:
+            self.logger.debug(f"설정 값이 변경되지 않았습니다: {key}={value}")
+    
+    def save(self) -> bool:
+        """
+        설정 파일 저장
+        
+        Returns:
+            bool: 성공 여부
+        """
+        try:
+            # 설정 파일 디렉토리 생성
+            os.makedirs(os.path.dirname(self.config_path), exist_ok=True)
+            
+            # 설정 파일 저장
+            with open(self.config_path, 'w', encoding='utf-8') as f:
+                json.dump(self.config, f, ensure_ascii=False, indent=2)
+            
+            self.logger.info("설정 파일 저장 완료")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"설정 파일 저장 실패: {str(e)}")
+            return False
     
     def set_batch(self, settings: Dict[str, Any]) -> None:
         """여러 설정 값을 한 번에 설정하기"""
@@ -138,46 +122,11 @@ class ConfigManager:
         for key, value in settings.items():
             if isinstance(key, (ConfigKey, SpreadsheetConfigKey)):
                 key = key.value
-            self._config[key] = value
+            self.config[key] = value
             
         # 한 번만 저장
-        self._save_config()
-    
-    def _save_config(self) -> None:
-        """설정 파일 저장"""
-        # 이미 저장 중이면 중첩 호출 방지
-        if ConfigManager._is_saving:
-            print("이미 설정 저장 중입니다. 중첩 저장 요청 무시")
-            return
-            
-        try:
-            # 저장 중 플래그 설정
-            ConfigManager._is_saving = True
-            
-            # 경로가 정해지지 않았으면 다시 결정
-            if not self._config_path:
-                self._determine_config_path()
-                
-            # 설정 파일 저장 경로 출력
-            print(f"설정을 저장합니다: {self._config_path}")
-            
-            # 설정 파일 저장
-            with open(self._config_path, 'w', encoding='utf-8') as f:
-                json.dump(self._config, f, ensure_ascii=False, indent=2)
-                
-            print(f"설정 저장 완료: {self._config_path}")
-        except Exception as e:
-            # 오류 상세 정보 출력
-            print(f"설정 파일 저장 실패: {str(e)}")
-            print(f"오류 유형: {type(e).__name__}")
-            
-            # 스택 트레이스 출력
-            import traceback
-            traceback.print_exc()
-        finally:
-            # 저장 중 플래그 해제
-            ConfigManager._is_saving = False
+        self.save()
     
     def get_all(self) -> Dict[str, Any]:
         """모든 설정 값 가져오기"""
-        return self._config.copy() 
+        return self.config.copy() 

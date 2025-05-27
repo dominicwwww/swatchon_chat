@@ -30,7 +30,7 @@ class MainWindow(QMainWindow):
         self.config = ConfigManager()
         
         # 윈도우 설정
-        self.setWindowTitle("SwatchOn 카카오톡 자동화")
+        self.setWindowTitle("SwatchOn Partner Hub")
         self.setMinimumSize(1200, 800)
         
         # 메인 위젯

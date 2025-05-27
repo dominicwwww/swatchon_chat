@@ -111,7 +111,7 @@ class PurchaseProduct(BaseModel):
     id: int = Field(..., description="상품 ID")
     store_name: str = Field(..., description="스토어명")
     store_address: str = Field("", description="스토어 주소")
-    store_ddm_address: str = Field(..., description="동대문 주소")
+    store_ddm_address: str = Field("", description="동대문 주소")
     quality_name: str = Field(..., description="품질명")
     color_number: int = Field(..., description="컬러 번호")
     color_code: Optional[str] = Field(None, description="컬러 코드")
@@ -120,7 +120,9 @@ class PurchaseProduct(BaseModel):
     pickup_at: datetime = Field(..., description="픽업 일시")
     delivery_method: str = Field(..., description="배송 방법")
     logistics_company: Optional[str] = Field(None, description="물류 회사")
-    status: str = Field(..., description="상태")
+    status: str = Field("", description="발주 상태")
+    message_status: str = Field("대기중", description="메시지 전송 상태")
+    processed_at: Optional[datetime] = Field(None, description="처리 시각")
 
     class Config:
         """Pydantic 설정"""

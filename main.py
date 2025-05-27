@@ -1,5 +1,5 @@
 """
-SwatchOn 카카오톡 자동화 애플리케이션 메인 진입점
+SwatchOn Partner Hub 애플리케이션 메인 진입점
 """
 import sys
 import atexit
@@ -47,7 +47,7 @@ def main():
     
     # QApplication 인스턴스 생성
     app = QApplication(sys.argv)
-    app.setApplicationName("SwatchOn 카카오톡 자동화")
+    app.setApplicationName("SwatchOn Partner Hub")
     app.setOrganizationName("SwatchOn")
     
     # 프로세스 정리 함수 등록 (Qt 종료 신호와 연결)
