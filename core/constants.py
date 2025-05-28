@@ -40,19 +40,30 @@ DEFAULT_FOOTER = "감사합니다.\nSwatchOn 팀 드림."
 # API 필드명 상수
 API_FIELDS = {
     "ID": "id",
+    "IMAGE_URL": "image_url",
+    "PRINT_URL": "print_url",
     "STORE_NAME": "store_name",
+    "STORE_URL": "store_url",
     "STORE_ADDRESS": "store_address",
     "STORE_DDM_ADDRESS": "store_ddm_address",
+    "QUALITY_CODE": "quality_code",
     "QUALITY_NAME": "quality_name",
+    "QUALITY_URL": "quality_url",
+    "SWATCH_PICKUPABLE": "swatch_pickupable",
+    "SWATCH_STORAGE": "swatch_storage",
     "COLOR_NUMBER": "color_number",
     "COLOR_CODE": "color_code",
     "QUANTITY": "quantity",
+    "ORDER_CODE": "order_code",
+    "ORDER_URL": "order_url",
     "PURCHASE_CODE": "purchase_code",
+    "PURCHASE_URL": "purchase_url",
+    "LAST_PICKUP_AT": "last_pickup_at",
     "PICKUP_AT": "pickup_at",
     "DELIVERY_METHOD": "delivery_method",
     "LOGISTICS_COMPANY": "logistics_company",
-    "STATUS": "status",  # 발주 상태
-    "MESSAGE_STATUS": "message_status"  # 메시지 전송 상태
+    "STATUS": "status",
+    "MESSAGE_STATUS": "message_status"
 }
 
 # 주문 상세 정보 기본 형식
@@ -199,17 +210,28 @@ LOGISTICS_COMPANIES = {
 # 테이블 컬럼명 매핑
 TABLE_COLUMN_NAMES = {
     "id": "ID",
+    "image_url": "이미지",
+    "print_url": "프린트",
     "store_name": "판매자",
+    "store_url": "판매자URL",
+    "store_address": "판매자주소",
     "store_ddm_address": "동대문주소",
     "quality_name": "퀄리티",
+    "quality_url": "퀄리티URL",
+    "swatch_pickupable": "스와치픽업",
+    "swatch_storage": "스와치보관",
     "color_number": "컬러순서",
     "color_code": "컬러코드",
     "quantity": "수량(yd)",
+    "order_code": "주문코드",
+    "order_url": "주문URL",
     "purchase_code": "발주번호",
+    "purchase_url": "발주URL",
+    "last_pickup_at": "최종출고일",
     "pickup_at": "출고일",
     "delivery_method": "배송방법",
     "logistics_company": "택배사",
-    "status": "발주상태",  # API에서 가져오는 발주 상태
-    "message_status": "메시지상태",  # 우리가 관리하는 메시지 상태
+    "status": "발주상태",
+    "message_status": "메시지상태",
     "processed_at": "처리시각"
 } 

@@ -269,24 +269,28 @@ class DataManager(QObject):
     def _map_api_response_to_product_data(self, item: Dict[str, Any]) -> Dict[str, Any]:
         """
         API 응답을 PurchaseProduct 데이터로 매핑
-        
-        Args:
-            item: API 응답 아이템
-            
-        Returns:
-            Dict[str, Any]: 변환된 데이터
         """
-        # 기본 필드 매핑 - 한글 필드명과 영문 필드명 모두 지원
         product_data = {
             'id': self._safe_int_convert(item.get('ID', item.get('id', 0))),
+            'image_url': item.get('image_url'),
+            'print_url': item.get('print_url'),
             'store_name': item.get('store_name', item.get('판매자', '')),
+            'store_url': item.get('store_url'),
             'store_address': item.get('store_address', ''),
             'store_ddm_address': item.get('store_ddm_address', item.get('판매자_동대문주소', '')),
+            'quality_code': item.get('quality_code'),
             'quality_name': item.get('quality_name', item.get('아이템', '')),
+            'quality_url': item.get('quality_url'),
+            'swatch_pickupable': item.get('swatch_pickupable'),
+            'swatch_storage': item.get('swatch_storage'),
             'color_number': item.get('color_number', item.get('컬러순서', 0)),
             'color_code': item.get('color_code', item.get('컬러코드', '')),
             'quantity': item.get('quantity', item.get('발주수량', 0)),
+            'order_code': item.get('order_code'),
+            'order_url': item.get('order_url'),
             'purchase_code': item.get('purchase_code', item.get('발주번호', '')),
+            'purchase_url': item.get('purchase_url'),
+            'last_pickup_at': self._safe_datetime_convert(item.get('last_pickup_at')) if item.get('last_pickup_at') else None,
             'pickup_at': item.get('pickup_at', item.get('최종출고일자', datetime.now().isoformat())),
             'delivery_method': item.get('delivery_method', self._map_delivery_method(item.get('발주배송수단', ''))),
             'logistics_company': item.get('logistics_company', self._map_logistics_company(item.get('판매자발송수단', ''))),
@@ -399,14 +403,25 @@ class DataManager(QObject):
         """PurchaseProduct 객체를 딕셔너리로 변환"""
         return {
             'id': item.id,
+            'image_url': getattr(item, 'image_url', None),
+            'print_url': getattr(item, 'print_url', None),
             'store_name': item.store_name,
+            'store_url': getattr(item, 'store_url', None),
             'store_address': item.store_address,
             'store_ddm_address': item.store_ddm_address,
+            'quality_code': getattr(item, 'quality_code', None),
             'quality_name': item.quality_name,
+            'quality_url': getattr(item, 'quality_url', None),
+            'swatch_pickupable': getattr(item, 'swatch_pickupable', None),
+            'swatch_storage': getattr(item, 'swatch_storage', None),
             'color_number': item.color_number,
             'color_code': item.color_code,
             'quantity': item.quantity,
+            'order_code': getattr(item, 'order_code', None),
+            'order_url': getattr(item, 'order_url', None),
             'purchase_code': item.purchase_code,
+            'purchase_url': getattr(item, 'purchase_url', None),
+            'last_pickup_at': item.last_pickup_at.isoformat() if getattr(item, 'last_pickup_at', None) and hasattr(item.last_pickup_at, 'isoformat') else (str(item.last_pickup_at) if getattr(item, 'last_pickup_at', None) else None),
             'pickup_at': item.pickup_at.isoformat() if hasattr(item.pickup_at, 'isoformat') else str(item.pickup_at),
             'delivery_method': item.delivery_method,
             'logistics_company': item.logistics_company,

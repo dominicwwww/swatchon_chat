@@ -123,7 +123,7 @@ class ShipmentRequestSection(BaseSection):
         self.content_layout.addWidget(self.filter_widget)
         
         # 테이블 위젯
-        self.table = ShipmentRequestTable()
+        self.table = ShipmentRequestTable(log_function=self.log)
         self.table.selection_changed.connect(self._on_table_selection_changed)
         self.content_layout.addWidget(self.table.main_widget)
         
@@ -382,14 +382,25 @@ class ShipmentRequestSection(BaseSection):
         """PurchaseProduct 객체를 딕셔너리로 변환"""
         return {
             'id': item.id,
+            'image_url': getattr(item, 'image_url', None),
+            'print_url': getattr(item, 'print_url', None),
             'store_name': item.store_name,
+            'store_url': getattr(item, 'store_url', None),
             'store_address': item.store_address,
             'store_ddm_address': item.store_ddm_address,
+            'quality_code': getattr(item, 'quality_code', None),
             'quality_name': item.quality_name,
+            'quality_url': getattr(item, 'quality_url', None),
+            'swatch_pickupable': getattr(item, 'swatch_pickupable', None),
+            'swatch_storage': getattr(item, 'swatch_storage', None),
             'color_number': item.color_number,
             'color_code': item.color_code,
             'quantity': item.quantity,
+            'order_code': getattr(item, 'order_code', None),
+            'order_url': getattr(item, 'order_url', None),
             'purchase_code': item.purchase_code,
+            'purchase_url': getattr(item, 'purchase_url', None),
+            'last_pickup_at': item.last_pickup_at.isoformat() if getattr(item, 'last_pickup_at', None) and hasattr(item.last_pickup_at, 'isoformat') else (str(item.last_pickup_at) if getattr(item, 'last_pickup_at', None) else None),
             'pickup_at': item.pickup_at.isoformat() if hasattr(item.pickup_at, 'isoformat') else str(item.pickup_at),
             'delivery_method': item.delivery_method,
             'logistics_company': item.logistics_company,
