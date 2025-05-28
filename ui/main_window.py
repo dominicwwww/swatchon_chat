@@ -103,101 +103,147 @@ class MainWindow(QMainWindow):
     
     def _initialize_sections(self):
         """섹션 초기화"""
-        # 대시보드 섹션
-        from ui.sections.dashboard_section import DashboardSection
-        dashboard_section = DashboardSection()
-        self._add_section(SectionType.DASHBOARD.value, dashboard_section)
-        
-        # FBO 섹션
-        from ui.sections.fbo.shipment_request_section import ShipmentRequestSection
-        from ui.sections.fbo.shipment_confirm_section import ShipmentConfirmSection
-        from ui.sections.fbo.po_section import PoSection
-        
-        self._add_section(SectionType.FBO_SHIPMENT_REQUEST.value, ShipmentRequestSection())
-        self._add_section(SectionType.FBO_SHIPMENT_CONFIRM.value, ShipmentConfirmSection())
-        self._add_section(SectionType.FBO_PO.value, PoSection())
-        
-        # SBO 섹션
-        from ui.sections.sbo.po_section import SboPoSection
-        from ui.sections.sbo.pickup_request_section import PickupRequestSection
-        
-        self._add_section(SectionType.SBO_PO.value, SboPoSection())
-        self._add_section(SectionType.SBO_PICKUP_REQUEST.value, PickupRequestSection())
-        
-        # 설정 섹션
-        from ui.sections.settings.settings_section import SettingsSection
-        
-        self._add_section(SectionType.SETTINGS.value, SettingsSection())
-        
-        # 템플릿 섹션
-        from ui.sections.settings.template_section import TemplateSection
-        
-        self._add_section(SectionType.TEMPLATE.value, TemplateSection())
+        try:
+            # 대시보드 섹션
+            from ui.sections.dashboard_section import DashboardSection
+            dashboard_section = DashboardSection()
+            self._add_section(SectionType.DASHBOARD.value, dashboard_section)
+            
+            # FBO 섹션
+            from ui.sections.fbo.shipment_request_section import ShipmentRequestSection
+            from ui.sections.fbo.shipment_confirm_section import ShipmentConfirmSection
+            from ui.sections.fbo.po_section import PoSection
+            
+            self._add_section(SectionType.FBO_SHIPMENT_REQUEST.value, ShipmentRequestSection())
+            self._add_section(SectionType.FBO_SHIPMENT_CONFIRM.value, ShipmentConfirmSection())
+            self._add_section(SectionType.FBO_PO.value, PoSection())
+            
+            # SBO 섹션
+            from ui.sections.sbo.po_section import SboPoSection
+            from ui.sections.sbo.pickup_request_section import PickupRequestSection
+            
+            self._add_section(SectionType.SBO_PO.value, SboPoSection())
+            self._add_section(SectionType.SBO_PICKUP_REQUEST.value, PickupRequestSection())
+            
+            # 설정 섹션
+            from ui.sections.settings.settings_section import SettingsSection
+            
+            self._add_section(SectionType.SETTINGS.value, SettingsSection())
+            
+            # 템플릿 섹션
+            from ui.sections.settings.template_section import TemplateSection
+            
+            self._add_section(SectionType.TEMPLATE.value, TemplateSection())
+            
+            # GA 관리비 정산 섹션
+            from ui.sections.ga.maintenance_fee_section import MaintenanceFeeSection
+            self._add_section(SectionType.GA_MAINTENANCE.value, MaintenanceFeeSection())
+            
+        except Exception as e:
+            print(f"섹션 초기화 중 오류 발생: {str(e)}")
+            # 최소한 대시보드 섹션은 생성
+            try:
+                from ui.sections.dashboard_section import DashboardSection
+                dashboard_section = DashboardSection()
+                self._add_section(SectionType.DASHBOARD.value, dashboard_section)
+            except Exception as dashboard_error:
+                print(f"대시보드 섹션 생성 실패: {str(dashboard_error)}")
     
     def _add_section(self, section_type: str, section: BaseSection):
         """섹션 추가"""
-        self._sections[section_type] = section
-        self.stack_widget.addWidget(section)
+        try:
+            self._sections[section_type] = section
+            self.stack_widget.addWidget(section)
+        except Exception as e:
+            print(f"섹션 추가 중 오류 발생 ({section_type}): {str(e)}")
     
     def _on_section_selected(self, section_type: str):
         """섹션 선택 시 호출되는 함수"""
-        # 이미 활성화된 섹션인지 확인하여 중복 호출 방지
-        current_index = self.stack_widget.currentIndex()
-        if current_index >= 0:
-            current_widget = self.stack_widget.widget(current_index)
-            if isinstance(current_widget, BaseSection) and current_widget == self._sections.get(section_type):
-                # 이미 현재 섹션이 활성화되어 있으면 중복 처리 방지
-                print(f"이미 활성화된 섹션입니다: {section_type}")
-                return
-                
-            # 이전 섹션 비활성화
-            if isinstance(current_widget, BaseSection):
-                current_widget.on_section_deactivated()
-        
-        # 먼저 사이드바 활성 섹션 변경 (중복 호출 방지를 위해 내부 플래그 사용)
         try:
+            # 이미 활성화된 섹션인지 확인하여 중복 호출 방지
+            current_index = self.stack_widget.currentIndex()
+            if current_index >= 0:
+                current_widget = self.stack_widget.widget(current_index)
+                if isinstance(current_widget, BaseSection) and current_widget == self._sections.get(section_type):
+                    # 이미 현재 섹션이 활성화되어 있으면 중복 처리 방지
+                    print(f"이미 활성화된 섹션입니다: {section_type}")
+                    return
+                    
+                # 이전 섹션 비활성화
+                if isinstance(current_widget, BaseSection):
+                    try:
+                        current_widget.on_section_deactivated()
+                    except Exception as e:
+                        print(f"이전 섹션 비활성화 중 오류: {str(e)}")
+            
             # 섹션 존재 확인
-            if section_type in self._sections:
-                # 마지막 섹션 저장 (중복 저장 방지)
+            if section_type not in self._sections:
+                print(f"섹션을 찾을 수 없습니다: {section_type}")
+                return
+            
+            # 마지막 섹션 저장 (중복 저장 방지)
+            try:
                 current_last_section = self.config.get("last_section", "")
                 if current_last_section != section_type:
                     self.config.set("last_section", section_type)
-                
-                # 사이드바 업데이트
+            except Exception as e:
+                print(f"마지막 섹션 저장 중 오류: {str(e)}")
+            
+            # 사이드바 업데이트
+            try:
                 self.sidebar.set_active_section(section_type)
-                
-                # 섹션 변경 및 활성화
+            except Exception as e:
+                print(f"사이드바 업데이트 중 오류: {str(e)}")
+            
+            # 섹션 변경 및 활성화
+            try:
                 section = self._sections[section_type]
                 self.stack_widget.setCurrentWidget(section)
                 
-                try:
-                    # 섹션 활성화 (예외 처리)
-                    section.on_section_activated()
-                except Exception as e:
-                    print(f"섹션 활성화 중 오류 발생: {str(e)}")
-            else:
-                print(f"섹션을 찾을 수 없습니다: {section_type}")
+                # 섹션 활성화
+                section.on_section_activated()
+                
+            except Exception as e:
+                print(f"섹션 활성화 중 오류 발생: {str(e)}")
+                
         except Exception as e:
-            print(f"섹션 선택 중 오류 발생: {str(e)}")
+            print(f"섹션 선택 중 예상치 못한 오류 발생: {str(e)}")
     
     def _apply_theme(self):
         """테마 적용"""
-        theme = get_theme()
-        
-        # 애플리케이션 팔레트 설정
-        app = QApplication.instance()
-        if app:
-            app.setPalette(theme.create_palette())
-            app.setStyleSheet(theme.get_stylesheet())
+        try:
+            theme = get_theme()
+            
+            # 애플리케이션 팔레트 설정
+            app = QApplication.instance()
+            if app:
+                app.setPalette(theme.create_palette())
+                app.setStyleSheet(theme.get_stylesheet())
+                
+        except Exception as e:
+            print(f"테마 적용 중 오류: {str(e)}")
     
     def closeEvent(self, event):
         """애플리케이션 종료 시 호출되는 함수"""
-        # 설정 저장
-        self.config.set("window_size", [self.width(), self.height()])
-        self.config.set("window_pos", [self.x(), self.y()])
-        
-        # 종료 이벤트 처리
-        event.accept()
+        try:
+            # 설정 저장
+            self.config.set("window_size", [self.width(), self.height()])
+            self.config.set("window_pos", [self.x(), self.y()])
+            
+            # 모든 섹션 비활성화
+            for section in self._sections.values():
+                try:
+                    if hasattr(section, 'on_section_deactivated'):
+                        section.on_section_deactivated()
+                except Exception as e:
+                    print(f"섹션 비활성화 중 오류: {str(e)}")
+            
+            # 종료 이벤트 처리
+            event.accept()
+            
+        except Exception as e:
+            print(f"애플리케이션 종료 중 오류: {str(e)}")
+            event.accept()  # 오류가 있어도 종료는 허용
 
 def create_app():
     """애플리케이션 및 메인 윈도우 생성"""

@@ -238,6 +238,19 @@ class Sidebar(QWidget):
         # 구분선
         self.scroll_layout.addWidget(SidebarSpacer(10))
         
+        # GA 카테고리
+        self.scroll_layout.addWidget(SidebarCategory("GA"))
+        
+        ga_maintenance_btn = SidebarButton("관리비 정산", icon_name="ph.calculator")
+        ga_maintenance_btn.clicked.connect(
+            lambda: self._on_button_clicked(SectionType.GA_MAINTENANCE.value)
+        )
+        self.scroll_layout.addWidget(ga_maintenance_btn)
+        self._buttons[SectionType.GA_MAINTENANCE.value] = ga_maintenance_btn
+        
+        # 구분선
+        self.scroll_layout.addWidget(SidebarSpacer(10))
+        
         # SBO 카테고리
         self.scroll_layout.addWidget(SidebarCategory("SBO"))
         

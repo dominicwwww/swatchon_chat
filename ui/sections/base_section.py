@@ -105,58 +105,49 @@ class BaseSection(QWidget):
     
     def log(self, message: str, log_type: str = LOG_INFO):
         """로그 메시지 추가"""
-        # LogType enum 값 변환 (이미 문자열 상수라면 그대로 사용)
-        if isinstance(log_type, str):
-            # 이미 문자열 상수이면 그대로 사용
-            if log_type in [LOG_INFO, LOG_DEBUG, LOG_WARNING, LOG_ERROR, LOG_SUCCESS]:
-                pass
-            # 문자열 형태의 로그 레벨인 경우 적절한 상수로 변환
-            elif log_type.lower() == "info":
-                log_type = LOG_INFO
-            elif log_type.lower() == "warning":
-                log_type = LOG_WARNING
-            elif log_type.lower() == "error":
-                log_type = LOG_ERROR
-            elif log_type.lower() == "success":
-                log_type = LOG_SUCCESS
-            elif log_type.lower() == "debug":
-                log_type = LOG_DEBUG
-            else:
-                # 알 수 없는 로그 타입은 기본값 사용
-                log_type = LOG_INFO
-                print(f"알 수 없는 로그 타입: {log_type}, 기본값(INFO)으로 설정")
-        else:
-            # LogType enum 객체인 경우 value 값을 사용
-            try:
-                log_type_value = getattr(log_type, "value", None)
-                if log_type_value:
-                    # 문자열로 변환 후 매핑
-                    log_type_str = str(log_type_value).lower()
-                    if log_type_str == "info":
-                        log_type = LOG_INFO
-                    elif log_type_str == "warning":
-                        log_type = LOG_WARNING
-                    elif log_type_str == "error":
-                        log_type = LOG_ERROR
-                    elif log_type_str == "success":
-                        log_type = LOG_SUCCESS
-                    elif log_type_str == "debug":
-                        log_type = LOG_DEBUG
-                    else:
-                        log_type = LOG_INFO
-                else:
-                    log_type = LOG_INFO
-            except Exception as e:
-                # 오류 발생 시 기본값 사용
-                print(f"로그 타입 변환 오류: {str(e)}, 기본값(INFO)으로 설정")
-                log_type = LOG_INFO
-            
         try:
-            self.log_widget.add_log(message, log_type)
+            # 로그 타입 정규화
+            if isinstance(log_type, str):
+                # 이미 정의된 상수인지 확인
+                if log_type in [LOG_INFO, LOG_DEBUG, LOG_WARNING, LOG_ERROR, LOG_SUCCESS]:
+                    normalized_type = log_type
+                else:
+                    # 문자열을 소문자로 변환하여 매핑
+                    type_mapping = {
+                        "info": LOG_INFO,
+                        "debug": LOG_DEBUG,
+                        "warning": LOG_WARNING,
+                        "error": LOG_ERROR,
+                        "success": LOG_SUCCESS
+                    }
+                    normalized_type = type_mapping.get(log_type.lower(), LOG_INFO)
+            else:
+                # Enum 객체인 경우 value 속성 확인
+                try:
+                    if hasattr(log_type, 'value'):
+                        type_str = str(log_type.value).lower()
+                        type_mapping = {
+                            "info": LOG_INFO,
+                            "debug": LOG_DEBUG,
+                            "warning": LOG_WARNING,
+                            "error": LOG_ERROR,
+                            "success": LOG_SUCCESS
+                        }
+                        normalized_type = type_mapping.get(type_str, LOG_INFO)
+                    else:
+                        normalized_type = LOG_INFO
+                except Exception:
+                    normalized_type = LOG_INFO
+            
+            # 로그 위젯에 메시지 추가
+            self.log_widget.add_log(message, normalized_type)
+            
         except Exception as e:
-            # 로그 추가 오류 시 콘솔에 출력
+            # 로그 추가 실패 시 콘솔에 출력
             print(f"로그 추가 오류: {str(e)}")
             print(f"메시지: {message}, 타입: {log_type}")
+            # 최소한 콘솔에는 메시지 출력
+            print(f"[{log_type}] {message}")
     
     def clear_logs(self):
         """로그 지우기"""

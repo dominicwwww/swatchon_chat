@@ -234,19 +234,14 @@ class ShipmentRequestSection(BaseSection):
     
     def _on_table_selection_changed(self, selected_items):
         """테이블 선택 변경 이벤트"""
-        # 선택된 항목의 ID를 기반으로 완전한 데이터 찾기
-        complete_selected_items = []
+        # 선택된 항목 ID 목록
+        selected_ids = [item['id'] for item in selected_items]
         
-        for selected_item in selected_items:
-            # 선택된 항목의 ID 가져오기
-            selected_id = selected_item.get('id')
-            
-            if selected_id:
-                # filtered_data에서 해당 ID의 완전한 PurchaseProduct 객체 찾기
-                for complete_item in self.data_manager.get_filtered_data():
-                    if complete_item.id == selected_id:
-                        complete_selected_items.append(complete_item)
-                        break
+        # 데이터 매니저에서 선택된 항목의 전체 데이터 가져오기
+        complete_selected_items = [
+            item for item in self.data_manager.get_filtered_data()
+            if item.id in selected_ids
+        ]
         
         # 완전한 데이터로 선택된 항목 저장
         self._selected_items = complete_selected_items
@@ -256,7 +251,6 @@ class ShipmentRequestSection(BaseSection):
         self.preview_button.setEnabled(has_selection)
         
         if has_selection:
-            # 전체 선택인 경우 (테이블의 모든 행이 선택된 경우)
             if len(complete_selected_items) == self.table.rowCount():
                 self.log(f"전체 {len(complete_selected_items)}개 항목이 선택되었습니다.", LOG_INFO)
             else:

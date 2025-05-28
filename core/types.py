@@ -47,7 +47,8 @@ class SectionType(Enum):
     SBO_PICKUP_REQUEST = "sbo_pickup_request"
     SETTINGS = "settings"
     TEMPLATE = "template"
-    DASHBOARD = "dashboard"  # 대시보드 섹션 추가
+    DASHBOARD = "dashboard"
+    GA_MAINTENANCE = "ga_maintenance"  # GA 관리비 정산 섹션 추가
 
 # UI 테마 모드
 class ThemeMode(Enum):

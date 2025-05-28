@@ -130,3 +130,10 @@ class ConfigManager:
     def get_all(self) -> Dict[str, Any]:
         """모든 설정 값 가져오기"""
         return self.config.copy() 
+
+    def get_login_url(self) -> str:
+        base = self.get("swatchon_admin_url", "https://admin.swatchon.me")
+        return f"{base}/users/sign_in"
+
+    def get_receive_url(self) -> str:
+        return self.get("receive_scraping_url") or f"{self.get('swatchon_admin_url', 'https://admin.swatchon.me')}/purchase_products/receive_index" 

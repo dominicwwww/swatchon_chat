@@ -79,9 +79,9 @@ class ShipmentRequestTable(QTableWidget):
         # 상태 필터
         self.status_filter = QComboBox()
         self.status_filter.addItem("모든 상태", "all")
-        self.status_filter.addItem("전송완료", "sent")
-        self.status_filter.addItem("전송실패", "failed")
-        self.status_filter.addItem("취소됨", "cancelled")
+        self.status_filter.addItem(MessageStatus.SENT.value, MessageStatus.SENT.value)
+        self.status_filter.addItem(MessageStatus.FAILED.value, MessageStatus.FAILED.value)
+        self.status_filter.addItem(MessageStatus.CANCELLED.value, MessageStatus.CANCELLED.value)
         self.status_filter.setCurrentIndex(0)  # 초기값을 "모든 상태"로 설정
         self.status_filter.currentIndexChanged.connect(self._on_filter_changed)
         self.top_layout.addWidget(self.status_filter)
@@ -200,7 +200,7 @@ class ShipmentRequestTable(QTableWidget):
                     self.setItem(row_idx, 11, QTableWidgetItem(logistics_company))
                     
                     # 메시지 상태 (우리가 관리하는 상태)
-                    message_status_text = getattr(item, 'message_status', '대기중') if hasattr(item, 'message_status') else '대기중'
+                    message_status_text = getattr(item, 'message_status', MessageStatus.PENDING.value) if hasattr(item, 'message_status') else MessageStatus.PENDING.value
                     message_status_item = QTableWidgetItem(message_status_text)
                     
                     # 메시지 상태에 따른 색상 설정
@@ -210,7 +210,7 @@ class ShipmentRequestTable(QTableWidget):
                     elif message_status_text == MessageStatus.FAILED.value:
                         message_status_item.setBackground(QColor(248, 215, 218))  # 연한 빨간색
                         message_status_item.setForeground(QColor(114, 28, 36))    # 진한 빨간색
-                    elif message_status_text == MessageStatus.IN_PROGRESS.value:
+                    elif message_status_text == MessageStatus.SENDING.value:
                         message_status_item.setBackground(QColor(255, 243, 205))  # 연한 노란색
                         message_status_item.setForeground(QColor(133, 100, 4))    # 진한 노란색
                     elif message_status_text == MessageStatus.CANCELLED.value:
@@ -219,6 +219,9 @@ class ShipmentRequestTable(QTableWidget):
                     elif message_status_text == MessageStatus.RETRY_WAITING.value:
                         message_status_item.setBackground(QColor(217, 237, 247))  # 연한 파란색
                         message_status_item.setForeground(QColor(12, 84, 96))     # 진한 파란색
+                    elif message_status_text == MessageStatus.PENDING.value:
+                        message_status_item.setBackground(QColor(255, 255, 255))  # 흰색
+                        message_status_item.setForeground(QColor(0, 0, 0))        # 검정색
                     
                     self.setItem(row_idx, 12, message_status_item)
                     
@@ -385,7 +388,7 @@ class ShipmentRequestTable(QTableWidget):
                             elif message_status == MessageStatus.FAILED.value:
                                 message_status_item.setBackground(QColor(248, 215, 218))  # 연한 빨간색
                                 message_status_item.setForeground(QColor(114, 28, 36))    # 진한 빨간색
-                            elif message_status == MessageStatus.IN_PROGRESS.value:
+                            elif message_status == MessageStatus.SENDING.value:
                                 message_status_item.setBackground(QColor(255, 243, 205))  # 연한 노란색
                                 message_status_item.setForeground(QColor(133, 100, 4))    # 진한 노란색
                             elif message_status == MessageStatus.CANCELLED.value:
@@ -394,6 +397,9 @@ class ShipmentRequestTable(QTableWidget):
                             elif message_status == MessageStatus.RETRY_WAITING.value:
                                 message_status_item.setBackground(QColor(217, 237, 247))  # 연한 파란색
                                 message_status_item.setForeground(QColor(12, 84, 96))     # 진한 파란색
+                            elif message_status == MessageStatus.PENDING.value:
+                                message_status_item.setBackground(QColor(255, 255, 255))  # 흰색
+                                message_status_item.setForeground(QColor(0, 0, 0))        # 검정색
                             
                             self.setItem(row, 12, message_status_item)
                             
@@ -403,8 +409,20 @@ class ShipmentRequestTable(QTableWidget):
                     except ValueError:
                         continue
         except Exception as e:
-            print(f"상태 업데이트 중 오류: {str(e)}") 
+            print(f"상태 업데이트 중 오류: {str(e)}")
 
     def _on_filter_changed(self, index):
-        # 상태 필터 변경 시 동작할 코드 (필요시 구현)
-        pass 
+        """상태 필터 변경 시 동작"""
+        selected_status = self.status_filter.currentData()
+        if selected_status == "all":
+            # 모든 행 표시
+            for row in range(self.rowCount()):
+                self.setRowHidden(row, False)
+        else:
+            # 선택된 상태와 일치하는 행만 표시
+            for row in range(self.rowCount()):
+                status_item = self.item(row, 12)  # 메시지 상태 컬럼
+                if status_item and status_item.text() == selected_status:
+                    self.setRowHidden(row, False)
+                else:
+                    self.setRowHidden(row, True) 
