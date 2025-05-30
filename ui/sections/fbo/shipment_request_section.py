@@ -371,12 +371,21 @@ class ShipmentRequestSection(BaseSection):
     
     def _update_item_status(self, item_ids: List[int], status: str, set_processed_time: bool = False):
         """항목 상태 업데이트 콜백"""
-        # 데이터 매니저를 통해 상태 업데이트
-        self.data_manager.update_item_status(item_ids, status, set_processed_time)
-        
-        # 테이블 업데이트
-        processed_at_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S') if set_processed_time else None
-        self.table.update_status(item_ids, status, processed_at_str)
+        try:
+            # 데이터 매니저를 통해 상태 업데이트
+            self.data_manager.update_item_status(item_ids, status, set_processed_time)
+            
+            # 테이블 업데이트
+            processed_at_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S') if set_processed_time else None
+            self.table.update_status(item_ids, status, processed_at_str)
+            
+            # 통계 실시간 갱신
+            self._update_all_statistics()
+            
+            # UI 업데이트를 위한 이벤트 처리
+            QApplication.processEvents()
+        except Exception as e:
+            self.log(f"상태 업데이트 중 오류: {str(e)}", LOG_ERROR)
     
     def _purchase_product_to_dict(self, item: PurchaseProduct) -> Dict[str, Any]:
         """PurchaseProduct 객체를 딕셔너리로 변환"""
@@ -429,7 +438,7 @@ class ShipmentRequestSection(BaseSection):
             self.statistics_widget.update_single_statistic("store_count", store_count)
             
             # 총 수량
-            total_quantity = sum(item.quantity for item in filtered_data)
+            total_quantity = sum(int(item.quantity) if not isinstance(item.quantity, int) and str(item.quantity).isdigit() else item.quantity for item in filtered_data)
             self.statistics_widget.update_single_statistic("total_quantity", total_quantity)
             
             # 동대문 픽업

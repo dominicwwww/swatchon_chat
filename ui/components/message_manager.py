@@ -240,10 +240,10 @@ class MessageManager(QObject):
         try:
             self.log(f"선택된 {len(selected_items)}개 항목으로 메시지 미리보기를 생성합니다.", LOG_INFO)
             
-            # 판매자별로 그룹핑
+            # 판매자별로 그룹핑 (store_name strip 적용)
             seller_groups = {}
             for item in selected_items:
-                seller_name = item.get("store_name", "알 수 없음")
+                seller_name = (item.get("store_name", "알 수 없음") or "알 수 없음").strip()
                 if seller_name not in seller_groups:
                     seller_groups[seller_name] = []
                 seller_groups[seller_name].append(item)
@@ -256,25 +256,35 @@ class MessageManager(QObject):
             # 각 판매자별로 메시지 생성
             for seller_name, seller_items in seller_groups.items():
                 try:
+                    # seller_items를 깊은 복사로 분리
+                    seller_items_copy = [dict(item) for item in seller_items]
                     # 주문 상세 정보 포맷팅
-                    order_details = self.format_order_details(seller_items)
+                    order_details = self.format_order_details(seller_items_copy)
                 
                     # 메시지 데이터 준비
                     message_data = {
                         "store_name": seller_name,
                         "order_details": order_details,
-                        "pickup_at": seller_items[0].get("pickup_at", ""),
-                        "total_orders": len(set(item.get("purchase_code", "") for item in seller_items)),
-                        "total_products": len(seller_items)
+                        "pickup_at": seller_items_copy[0].get("pickup_at", ""),
+                        "total_orders": len(set(item.get("purchase_code", "") for item in seller_items_copy)),
+                        "total_products": len(seller_items_copy)
                     }
                     
                     # 기본 API 필드 추가
                     for field_key, field_name in API_FIELDS.items():
                         if field_name not in message_data:
-                            message_data[field_name] = seller_items[0].get(field_name, "")
+                            message_data[field_name] = seller_items_copy[0].get(field_name, "")
+                    
+                    # quantity를 int로 변환
+                    if "quantity" in message_data:
+                        try:
+                            message_data["quantity"] = int(float(message_data["quantity"]))
+                        except (ValueError, TypeError):
+                            pass
                     
                     # 조건부 템플릿 적용
                     template = self.template_service.load_template(self.order_type, self.operation_type)
+                    message = None
                     if template and template.get("conditions"):
                         for condition in template.get("conditions", []):
                             if self.template_service.evaluate_condition(message_data, condition):
@@ -285,15 +295,8 @@ class MessageManager(QObject):
                                     for k, v in message_data.items():
                                         message = message.replace(f"{{{k}}}", str(v))
                                     break
-                        else:
-                            # 조건이 만족되지 않으면 기본 템플릿 사용
-                            message = self.template_service.render_message(
-                                self.order_type,
-                                self.operation_type,
-                                message_data
-                            )
-                    else:
-                        # 조건부 템플릿이 없으면 기본 템플릿 사용
+                    if not message:
+                        # 조건이 만족되지 않거나 조건부 템플릿이 없으면 기본 템플릿 사용
                         message = self.template_service.render_message(
                             self.order_type,
                             self.operation_type,
@@ -301,14 +304,14 @@ class MessageManager(QObject):
                         )
                 
                     if message:
-                        # 주소록에서 실제 채팅방 이름 조회
-                        chat_room_name = self.address_book_service.get_chat_room_name(seller_name)
+                        # 주소록에서 실제 채팅방 이름 조회 (strip 적용)
+                        chat_room_name = self.address_book_service.get_chat_room_name(seller_name.strip())
                         
-                        # 미리보기 데이터에 저장
+                        # 미리보기 데이터에 저장 (seller_items_copy로 저장)
                         self._message_preview_data[seller_name] = {
                             'message': message,
                             'chat_room_name': chat_room_name,
-                            'items': seller_items
+                            'items': seller_items_copy
                         }
                         
                         self.log(f"--- [{seller_name}] → [{chat_room_name}] ---", LOG_INFO)
@@ -393,65 +396,53 @@ class MessageManager(QObject):
                                 if item_id:
                                     cancelled_item_ids.append(item_id)
                     break
-                
                 try:
                     chat_room_name = data['chat_room_name']
                     message = data['message']
                     seller_items = data['items']
-                    
                     # 해당 판매자의 항목들을 "전송중" 상태로 업데이트
                     seller_item_ids = [item.get('id') for item in seller_items if item.get('id')]
                     if update_status_callback:
                         update_status_callback(seller_item_ids, MessageStatus.SENDING.value)
-                    
                     self.log(f"[{seller_name}] → [{chat_room_name}] 메시지 전송 중...", LOG_INFO)
-                    
-                    # 카카오톡으로 실제 메시지 전송
-                    success = self.kakao_service.send_message_to_seller(chat_room_name, message, log_function=self.log)
-                    
+                    try:
+                        # 카카오톡으로 실제 메시지 전송
+                        success = self.kakao_service.send_message_to_seller(chat_room_name, message, log_function=self.log)
+                    except Exception as send_exc:
+                        self.log(f"카카오톡 메시지 전송 중 예외 발생: {send_exc}", LOG_ERROR)
+                        success = False
                     if success:
                         self.log(f"✅ {seller_name}({chat_room_name})에게 메시지 전송 성공", LOG_SUCCESS)
                         success_count += 1
-                        
-                        # 전송 성공한 항목들의 ID 수집
                         for item in seller_items:
                             item_id = item.get('id')
                             if item_id:
                                 sent_item_ids.append(item_id)
+                        if update_status_callback:
+                            update_status_callback(seller_item_ids, MessageStatus.SENT.value, True)
                     else:
                         self.log(f"❌ {seller_name}({chat_room_name}) 메시지 전송 실패", LOG_ERROR)
                         fail_count += 1
-                        
-                        # 전송 실패한 항목들을 실패 상태로 업데이트
                         failed_item_ids = [item.get('id') for item in seller_items if item.get('id')]
                         if update_status_callback:
                             update_status_callback(failed_item_ids, MessageStatus.FAILED.value)
-                        
                 except Exception as e:
-                    self.log(f"❌ {seller_name} 메시지 전송 실패: {str(e)}", LOG_ERROR)
+                    self.log(f"❌ {seller_name} 메시지 전송 실패(예외): {str(e)}", LOG_ERROR)
                     fail_count += 1
-                    
-                    # 예외 발생한 항목들을 실패 상태로 업데이트
                     if 'seller_items' in locals():
                         failed_item_ids = [item.get('id') for item in seller_items if item.get('id')]
                         if update_status_callback:
                             update_status_callback(failed_item_ids, MessageStatus.FAILED.value)
-            
-            # 전송 성공한 항목들의 상태를 "전송완료"로 업데이트
-            if sent_item_ids and update_status_callback:
-                update_status_callback(sent_item_ids, MessageStatus.SENT.value, True)
-            
+                    continue  # 예외 발생 시에도 다음 판매자 계속 진행
             # 취소된 항목들의 상태를 "취소됨"으로 업데이트
             if cancelled_item_ids and update_status_callback:
                 update_status_callback(cancelled_item_ids, MessageStatus.CANCELLED.value)
-            
             # 전송 결과 요약
             self.log(f"=== 전송 완료 ===", LOG_INFO)
             if self._emergency_stop:
                 self.log(f"성공: {success_count}건, 실패: {fail_count}건, 취소: {len(cancelled_item_ids)}건", LOG_INFO)
             else:
                 self.log(f"성공: {success_count}건, 실패: {fail_count}건", LOG_INFO)
-            
             return {
                 'success': True,
                 'success_count': success_count,
@@ -460,9 +451,9 @@ class MessageManager(QObject):
                 'sent_item_ids': sent_item_ids,
                 'emergency_stop': self._emergency_stop
             }
-            
         except Exception as e:
-            self.log(f"메시지 전송 중 오류: {str(e)}", LOG_ERROR)
+            self.log(f"메시지 전송 중 치명적 오류: {str(e)}", LOG_ERROR)
+            # 예외 발생 시에도 실패로 결과 반환
             return {'success': False, 'error': str(e)}
     
     def emergency_stop(self):

@@ -656,6 +656,13 @@ class TemplateSection(BaseSection):
                         pickup_at = pickup_at.split("T")[0]  # T 앞부분만 추출
                         processed_data["pickup_at"] = pickup_at
                     
+                    # quantity를 int로 변환
+                    if "quantity" in processed_data:
+                        try:
+                            processed_data["quantity"] = int(float(processed_data["quantity"]))
+                        except (ValueError, TypeError):
+                            pass
+                    
                     self.log(f"치환 전: delivery_method='{delivery_method}', logistics_company='{logistics_company}'", LOG_DEBUG)
                     
                     processed_data["delivery_method"] = DELIVERY_METHODS.get(delivery_method, delivery_method)
@@ -683,6 +690,13 @@ class TemplateSection(BaseSection):
             msg_data["order_details"] = "\n".join(order_details_blocks)
             msg_data["store_name"] = current_seller
 
+            # quantity를 int로 변환
+            if "quantity" in msg_data:
+                try:
+                    msg_data["quantity"] = int(float(msg_data["quantity"]))
+                except (ValueError, TypeError):
+                    pass
+
             # 템플릿 렌더링
             message = self.template_service.render_message(
                 OrderType(self._current_order_type),
@@ -691,7 +705,17 @@ class TemplateSection(BaseSection):
             )
 
             if message:
-                self.preview_text.setText(message)
+                try:
+                    # 안전하게 텍스트 출력 (길이 체크 및 예외처리)
+                    self.preview_text.setPlainText("")
+                    doc = self.preview_text.document()
+                    cursor = self.preview_text.textCursor()
+                    pos = max(0, doc.characterCount() - 1)
+                    cursor.setPosition(pos)
+                    self.preview_text.setTextCursor(cursor)
+                    self.preview_text.insertPlainText(message)
+                except Exception as e:
+                    self.log(f"미리보기 결과 출력 중 오류: {e}", LOG_ERROR)
                 self.log(f"미리보기 생성 완료: {current_seller} 판매자", LOG_SUCCESS)
             else:
                 self.log("미리보기 생성에 실패했습니다.", LOG_ERROR)

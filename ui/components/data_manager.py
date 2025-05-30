@@ -483,23 +483,21 @@ class DataManager(QObject):
             self.log(f"데이터 필터링 중 오류: {str(e)}", LOG_ERROR)
             return []
     
-    def get_statistics(self) -> Dict[str, int]:
+    def get_statistics(self) -> Dict[str, str]:
         """
-        데이터 통계 정보 반환
-        
+        데이터 통계 정보 반환 (숫자에 3자리마다 콤마)
         Returns:
-            Dict[str, int]: 통계 정보
+            Dict[str, str]: 통계 정보 (문자열)
         """
         if not self.all_data:
             return {
-                'total': 0,
-                'pending': 0,
-                'sending': 0,
-                'sent': 0,
-                'failed': 0,
-                'cancelled': 0
+                'total': '0',
+                'pending': '0',
+                'sending': '0',
+                'sent': '0',
+                'failed': '0',
+                'cancelled': '0'
             }
-        
         stats = {
             'total': len(self.all_data),
             'pending': len([item for item in self.all_data if getattr(item, 'message_status', '대기중') in [ShipmentStatus.PENDING.value, "대기중", ""]]),
@@ -508,8 +506,8 @@ class DataManager(QObject):
             'failed': len([item for item in self.all_data if getattr(item, 'message_status', '대기중') == ShipmentStatus.FAILED.value]),
             'cancelled': len([item for item in self.all_data if getattr(item, 'message_status', '대기중') == ShipmentStatus.CANCELLED.value])
         }
-        
-        return stats
+        # 3자리 콤마 포맷
+        return {k: f"{v:,}" for k, v in stats.items()}
     
     def update_item_status(self, item_ids: List[int], status: str, set_processed_time: bool = False):
         """

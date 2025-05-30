@@ -41,19 +41,9 @@ class PickupRequestSection(BaseSection):
         self.search_input.setPlaceholderText("판매자, 픽업번호 검색...")
         self.search_input.textChanged.connect(self._on_search_changed)
         
-        # 상태 필터
-        self.status_filter = QComboBox()
-        self.status_filter.addItem("모든 상태", "all")
-        self.status_filter.addItem("전송완료", MessageStatus.SENT.value)
-        self.status_filter.addItem("전송실패", MessageStatus.FAILED.value)
-        self.status_filter.setCurrentIndex(0)  # 초기값을 "모든 상태"로 설정
-        self.status_filter.currentIndexChanged.connect(self._on_filter_changed)
-        
         # 필터 레이아웃에 추가
         filter_layout.addWidget(QLabel("검색:"))
         filter_layout.addWidget(self.search_input)
-        filter_layout.addWidget(QLabel("상태:"))
-        filter_layout.addWidget(self.status_filter)
         filter_layout.addStretch()
         
         self.content_layout.addWidget(filter_widget)
@@ -65,9 +55,9 @@ class PickupRequestSection(BaseSection):
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         
         # 테이블 헤더 설정
-        self.table.setColumnCount(8)
+        self.table.setColumnCount(10)
         self.table.setHorizontalHeaderLabels([
-            "선택", "판매자", "픽업번호", "스와치 정보", "픽업 날짜", "픽업 시간", "주소", "상태"
+            "선택", "판매자", "픽업번호", "스와치 정보", "픽업 날짜", "픽업 시간", "주소", "상태", "메시지상태", "처리시각"
         ])
         
         # 테이블 헤더 설정
@@ -80,6 +70,8 @@ class PickupRequestSection(BaseSection):
         header.setSectionResizeMode(5, QHeaderView.ResizeToContents)  # 픽업 시간
         header.setSectionResizeMode(6, QHeaderView.Stretch)           # 주소
         header.setSectionResizeMode(7, QHeaderView.ResizeToContents)  # 상태
+        header.setSectionResizeMode(8, QHeaderView.ResizeToContents)  # 메시지상태
+        header.setSectionResizeMode(9, QHeaderView.ResizeToContents)  # 처리시각
         
         self.content_layout.addWidget(self.table)
         
@@ -110,10 +102,10 @@ class PickupRequestSection(BaseSection):
     def _load_dummy_data(self):
         """테스트 목적의 더미 데이터 로드"""
         dummy_data = [
-            {"seller": "판매자A", "pickup_number": "PK-2023-001", "swatch_info": "면 원단 외 3종", "pickup_date": "2023-05-25", "pickup_time": "오전 10:00", "address": "서울시 강남구 테헤란로 123", "status": "대기중"},
-            {"seller": "판매자B", "pickup_number": "PK-2023-002", "swatch_info": "실크 혼방 외 2종", "pickup_date": "2023-05-26", "pickup_time": "오후 2:00", "address": "서울시 서초구 서초대로 456", "status": "대기중"},
-            {"seller": "판매자C", "pickup_number": "PK-2023-003", "swatch_info": "울 개버딘 외 1종", "pickup_date": "2023-05-27", "pickup_time": "오전 11:30", "address": "서울시 성동구 왕십리로 789", "status": "전송완료"},
-            {"seller": "판매자A", "pickup_number": "PK-2023-004", "swatch_info": "폴리에스터 트윌 외 4종", "pickup_date": "2023-05-28", "pickup_time": "오후 3:30", "address": "서울시 강남구 테헤란로 123", "status": "전송실패"}
+            {"seller": "판매자A", "pickup_number": "PK-2023-001", "swatch_info": "면 원단 외 3종", "pickup_date": "2023-05-25", "pickup_time": "오전 10:00", "address": "서울시 강남구 테헤란로 123", "status": "대기중", "message_status": "대기중", "processed_at": ""},
+            {"seller": "판매자B", "pickup_number": "PK-2023-002", "swatch_info": "실크 혼방 외 2종", "pickup_date": "2023-05-26", "pickup_time": "오후 2:00", "address": "서울시 서초구 서초대로 456", "status": "대기중", "message_status": "대기중", "processed_at": ""},
+            {"seller": "판매자C", "pickup_number": "PK-2023-003", "swatch_info": "울 개버딘 외 1종", "pickup_date": "2023-05-27", "pickup_time": "오전 11:30", "address": "서울시 성동구 왕십리로 789", "status": "전송완료", "message_status": "전송완료", "processed_at": "2023-05-27 12:00:00"},
+            {"seller": "판매자A", "pickup_number": "PK-2023-004", "swatch_info": "폴리에스터 트윌 외 4종", "pickup_date": "2023-05-28", "pickup_time": "오후 3:30", "address": "서울시 강남구 테헤란로 123", "status": "전송실패", "message_status": "전송실패", "processed_at": "2023-05-28 15:40:00"}
         ]
         
         # 테이블 데이터 설정
@@ -132,6 +124,8 @@ class PickupRequestSection(BaseSection):
             self.table.setItem(row, 5, QTableWidgetItem(item["pickup_time"]))
             self.table.setItem(row, 6, QTableWidgetItem(item["address"]))
             self.table.setItem(row, 7, QTableWidgetItem(item["status"]))
+            self.table.setItem(row, 8, QTableWidgetItem(item["message_status"]))
+            self.table.setItem(row, 9, QTableWidgetItem(item["processed_at"]))
             
             # 상태에 따른 배경색 설정
             status_item = self.table.item(row, 7)
@@ -180,12 +174,6 @@ class PickupRequestSection(BaseSection):
         """검색어 변경 이벤트"""
         # TODO: 검색 기능 구현
         self.log(f"검색어: {text}", LogType.DEBUG.value)
-    
-    def _on_filter_changed(self, index):
-        """필터 변경 이벤트"""
-        filter_value = self.status_filter.itemData(index)
-        self.log(f"상태 필터: {filter_value}", LogType.DEBUG.value)
-        # TODO: 필터링 기능 구현
     
     def _on_select_all_clicked(self):
         """모두 선택 버튼 클릭 이벤트"""

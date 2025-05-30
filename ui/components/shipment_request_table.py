@@ -52,6 +52,17 @@ class ShipmentRequestTable(QTableWidget):
         self.photo_checkbox.setChecked(False)  # 초기값: 비활성화
         self.photo_checkbox.stateChanged.connect(self._on_photo_checkbox_changed)
         self.top_layout.addWidget(self.photo_checkbox)
+
+        # 전체 선택/해제 버튼 (왼쪽으로 이동)
+        self.select_all_button = QPushButton("전체 선택")
+        self.select_all_button.clicked.connect(self._on_select_all_clicked)
+        self.select_all_button.setMaximumWidth(80)
+        self.top_layout.addWidget(self.select_all_button)
+
+        self.clear_selection_button = QPushButton("선택 해제")
+        self.clear_selection_button.clicked.connect(self._on_clear_selection_clicked)
+        self.clear_selection_button.setMaximumWidth(80)
+        self.top_layout.addWidget(self.clear_selection_button)
         
         # 선택된 항목 수 표시 라벨
         self.selection_label = QLabel("선택된 항목: 0개")
@@ -67,26 +78,12 @@ class ShipmentRequestTable(QTableWidget):
         """)
         self.top_layout.addWidget(self.selection_label)
         
-        # 전체 선택/해제 버튼
-        self.select_all_button = QPushButton("전체 선택")
-        self.select_all_button.clicked.connect(self._on_select_all_clicked)
-        self.select_all_button.setMaximumWidth(80)
-        self.top_layout.addWidget(self.select_all_button)
-        
-        self.clear_selection_button = QPushButton("선택 해제")
-        self.clear_selection_button.clicked.connect(self._on_clear_selection_clicked)
-        self.clear_selection_button.setMaximumWidth(80)
-        self.top_layout.addWidget(self.clear_selection_button)
-        
-        # 상태 필터
-        self.status_filter = QComboBox()
-        self.status_filter.addItem("모든 상태", "all")
-        self.status_filter.addItem(MessageStatus.SENT.value, MessageStatus.SENT.value)
-        self.status_filter.addItem(MessageStatus.FAILED.value, MessageStatus.FAILED.value)
-        self.status_filter.addItem(MessageStatus.CANCELLED.value, MessageStatus.CANCELLED.value)
-        self.status_filter.setCurrentIndex(0)  # 초기값을 "모든 상태"로 설정
-        self.status_filter.currentIndexChanged.connect(self._on_filter_changed)
-        self.top_layout.addWidget(self.status_filter)
+        # 출고일 필터 드롭다운 추가
+        self.pickup_date_filter = QComboBox()
+        self.pickup_date_filter.addItem("전체", "all")
+        self.pickup_date_filter.currentIndexChanged.connect(self._on_pickup_date_filter_changed)
+        self.top_layout.addWidget(QLabel("출고일:"))
+        self.top_layout.addWidget(self.pickup_date_filter)
         
         # 레이아웃 정렬
         self.top_layout.addStretch()
@@ -100,30 +97,32 @@ class ShipmentRequestTable(QTableWidget):
         self.setSelectionMode(QTableWidget.SingleSelection)
         self.setEditTriggers(QTableWidget.NoEditTriggers)
         self.setSortingEnabled(True)
-
+        
         # 이미지, store_name(링크), 나머지 주요 필드만 컬럼으로 표시
-        self.setColumnCount(14)
+        self.setColumnCount(19)
         self.setHorizontalHeaderLabels([
             "",  # 체크박스
-            TABLE_COLUMN_NAMES[API_FIELDS["IMAGE_URL"]],
-            TABLE_COLUMN_NAMES[API_FIELDS["ID"]],
-            TABLE_COLUMN_NAMES[API_FIELDS["STORE_NAME"]],
-            TABLE_COLUMN_NAMES[API_FIELDS["STORE_DDM_ADDRESS"]],
-            TABLE_COLUMN_NAMES[API_FIELDS["QUALITY_NAME"]],
-            TABLE_COLUMN_NAMES[API_FIELDS["SWATCH_PICKUPABLE"]],
-            TABLE_COLUMN_NAMES[API_FIELDS["SWATCH_STORAGE"]],
-            TABLE_COLUMN_NAMES[API_FIELDS["COLOR_NUMBER"]],
-            TABLE_COLUMN_NAMES[API_FIELDS["COLOR_CODE"]],
-            TABLE_COLUMN_NAMES[API_FIELDS["QUANTITY"]],
-            TABLE_COLUMN_NAMES[API_FIELDS["PURCHASE_CODE"]],
-            TABLE_COLUMN_NAMES[API_FIELDS["PICKUP_AT"]],
-            TABLE_COLUMN_NAMES[API_FIELDS["DELIVERY_METHOD"]],
-            TABLE_COLUMN_NAMES[API_FIELDS["LOGISTICS_COMPANY"]],
-            TABLE_COLUMN_NAMES[API_FIELDS["MESSAGE_STATUS"]],
-            TABLE_COLUMN_NAMES["processed_at"]
+            TABLE_COLUMN_NAMES[API_FIELDS["IMAGE_URL"]],   # 1
+            TABLE_COLUMN_NAMES[API_FIELDS["ID"]],          # 2
+            TABLE_COLUMN_NAMES[API_FIELDS["STORE_NAME"]],  # 3
+            TABLE_COLUMN_NAMES[API_FIELDS["STORE_DDM_ADDRESS"]], # 4
+            TABLE_COLUMN_NAMES[API_FIELDS["QUALITY_NAME"]],      # 5
+            TABLE_COLUMN_NAMES[API_FIELDS["SWATCH_PICKUPABLE"]], # 6
+            TABLE_COLUMN_NAMES[API_FIELDS["SWATCH_STORAGE"]],    # 7
+            TABLE_COLUMN_NAMES[API_FIELDS["COLOR_NUMBER"]],      # 8
+            TABLE_COLUMN_NAMES[API_FIELDS["COLOR_CODE"]],        # 9
+            TABLE_COLUMN_NAMES[API_FIELDS["QUANTITY"]],          # 10
+            TABLE_COLUMN_NAMES[API_FIELDS["PURCHASE_CODE"]],     # 11
+            TABLE_COLUMN_NAMES[API_FIELDS["ORDER_CODE"]],        # 12
+            TABLE_COLUMN_NAMES[API_FIELDS["PICKUP_AT"]],         # 13
+            TABLE_COLUMN_NAMES[API_FIELDS["LAST_PICKUP_AT"]],    # 14
+            TABLE_COLUMN_NAMES[API_FIELDS["DELIVERY_METHOD"]],   # 15
+            TABLE_COLUMN_NAMES[API_FIELDS["LOGISTICS_COMPANY"]], # 16
+            TABLE_COLUMN_NAMES[API_FIELDS["MESSAGE_STATUS"]],    # 17
+            TABLE_COLUMN_NAMES["processed_at"]                   # 18
         ])
         header = self.horizontalHeader()
-        for i in range(14):
+        for i in range(19):
             header.setSectionResizeMode(i, QHeaderView.ResizeToContents)
             
         # 헤더 클릭 이벤트 연결
@@ -144,22 +143,41 @@ class ShipmentRequestTable(QTableWidget):
         
     def update_data(self, data: List[PurchaseProduct]):
         """테이블 데이터 업데이트"""
-        # 항상 체크박스 상태와 동기화
         self.load_photo = self.photo_checkbox.isChecked()
         try:
             self._current_data = data
+            # 출고일 필터 드롭다운 값 세팅
+            prev_value = self.pickup_date_filter.currentData() if self.pickup_date_filter.count() > 0 else "all"
+            pickup_dates = sorted({item.pickup_at.strftime('%Y-%m-%d') if hasattr(item.pickup_at, 'strftime') else str(item.pickup_at) for item in data})
+            self.pickup_date_filter.blockSignals(True)
+            self.pickup_date_filter.clear()
+            self.pickup_date_filter.addItem("전체", "all")
+            for d in pickup_dates:
+                label = d[5:] if len(d) >= 7 else d
+                self.pickup_date_filter.addItem(label, d)
+            # 기존 선택값 복원
+            idx = self.pickup_date_filter.findData(prev_value)
+            if idx != -1:
+                self.pickup_date_filter.setCurrentIndex(idx)
+            self.pickup_date_filter.blockSignals(False)
+            # 필터 적용
+            filter_value = self.pickup_date_filter.currentData()
+            if not filter_value or filter_value == "all":
+                filtered = data
+            else:
+                filtered = [item for item in data if (item.pickup_at.strftime('%Y-%m-%d') if hasattr(item.pickup_at, 'strftime') else str(item.pickup_at)) == filter_value]
             self.setRowCount(0)
-            if not data:
+            if not filtered:
                 return
-            total_rows = len(data)
+            total_rows = len(filtered)
             self.setRowCount(total_rows)
-            for row_idx, item in enumerate(data):
+            for row_idx, item in enumerate(filtered):
                 try:
                     checkbox = QCheckBox()
                     checkbox.setProperty("row_index", row_idx)
                     checkbox.stateChanged.connect(self._on_any_checkbox_changed)
                     self.setCellWidget(row_idx, 0, self._create_checkbox_widget(checkbox))
-
+                    
                     # 1. 이미지 썸네일 (사진 로드 체크박스 체크 시만)
                     label = QLabel()
                     label.setAlignment(Qt.AlignCenter)
@@ -195,7 +213,7 @@ class ShipmentRequestTable(QTableWidget):
                         if self.log_function:
                             self.log_function("사진 로드가 비활성화되어 썸네일을 표시하지 않습니다.", LOG_INFO)
                     self.setCellWidget(row_idx, 1, label)
-
+                    
                     # 2. ID
                     self.setItem(row_idx, 2, QTableWidgetItem(str(item.id)))
 
@@ -206,7 +224,7 @@ class ShipmentRequestTable(QTableWidget):
                         store_name_item.setForeground(QBrush(QColor(0, 102, 204)))
                         store_name_item.setData(Qt.UserRole, store_url)
                     self.setItem(row_idx, 3, store_name_item)
-
+                    
                     # 4. 동대문주소
                     self.setItem(row_idx, 4, QTableWidgetItem(item.store_ddm_address))
                     # 5. 퀄리티 | 품질코드
@@ -242,8 +260,12 @@ class ShipmentRequestTable(QTableWidget):
                     # 9. 컬러코드
                     self.setItem(row_idx, 9, QTableWidgetItem(str(item.color_code or "")))
                     # 10. 수량
-                    quantity_item = QTableWidgetItem(str(item.quantity))
-                    quantity_item.setData(Qt.UserRole, item.quantity)
+                    try:
+                        qty = int(item.quantity)
+                    except Exception:
+                        qty = 0
+                    quantity_item = QTableWidgetItem(f"{qty}")
+                    quantity_item.setData(Qt.UserRole, qty)
                     self.setItem(row_idx, 10, quantity_item)
                     # 11. 발주번호 (purchase_url 하이퍼링크)
                     purchase_code_item = QTableWidgetItem(item.purchase_code)
@@ -252,16 +274,26 @@ class ShipmentRequestTable(QTableWidget):
                         purchase_code_item.setForeground(QBrush(QColor(0, 102, 204)))
                         purchase_code_item.setData(Qt.UserRole, purchase_url)
                     self.setItem(row_idx, 11, purchase_code_item)
-                    # 12. 출고일
+                    # 12. 주문코드 (order_url 하이퍼링크)
+                    order_code_item = QTableWidgetItem(item.order_code if item.order_code else "")
+                    order_url = getattr(item, 'order_url', None)
+                    if order_url:
+                        order_code_item.setForeground(QBrush(QColor(0, 102, 204)))
+                        order_code_item.setData(Qt.UserRole, order_url)
+                    self.setItem(row_idx, 12, order_code_item)
+                    # 13. 출고일
                     pickup_date = item.pickup_at.strftime("%Y-%m-%d") if hasattr(item.pickup_at, 'strftime') else str(item.pickup_at)
-                    self.setItem(row_idx, 12, QTableWidgetItem(pickup_date))
-                    # 13. 배송방법
+                    self.setItem(row_idx, 13, QTableWidgetItem(pickup_date))
+                    # 14. 최종출고일
+                    last_pickup_date = item.last_pickup_at.strftime("%Y-%m-%d") if getattr(item, 'last_pickup_at', None) and hasattr(item.last_pickup_at, 'strftime') else (str(item.last_pickup_at) if getattr(item, 'last_pickup_at', None) else "")
+                    self.setItem(row_idx, 14, QTableWidgetItem(last_pickup_date))
+                    # 15. 배송방법
                     delivery_method = DELIVERY_METHODS.get(item.delivery_method, item.delivery_method)
-                    self.setItem(row_idx, 13, QTableWidgetItem(delivery_method))
-                    # 14. 택배사
+                    self.setItem(row_idx, 15, QTableWidgetItem(delivery_method))
+                    # 16. 택배사
                     logistics_company = LOGISTICS_COMPANIES.get(item.logistics_company, item.logistics_company) if item.logistics_company else ""
-                    self.setItem(row_idx, 14, QTableWidgetItem(logistics_company))
-                    # 15. 메시지상태 (색상 기존대로)
+                    self.setItem(row_idx, 16, QTableWidgetItem(logistics_company))
+                    # 17. 메시지상태 (색상 기존대로)
                     message_status_text = getattr(item, 'message_status', MessageStatus.PENDING.value) if hasattr(item, 'message_status') else MessageStatus.PENDING.value
                     message_status_item = QTableWidgetItem(message_status_text)
                     if message_status_text == MessageStatus.SENT.value:
@@ -282,13 +314,13 @@ class ShipmentRequestTable(QTableWidget):
                     elif message_status_text == MessageStatus.PENDING.value:
                         message_status_item.setBackground(QColor(255, 255, 255))
                         message_status_item.setForeground(QColor(0, 0, 0))
-                    self.setItem(row_idx, 15, message_status_item)
-                    # 16. 처리시각
+                    self.setItem(row_idx, 17, message_status_item)
+                    # 18. 처리시각
                     if hasattr(item, 'processed_at') and item.processed_at:
                         processed_at = item.processed_at.strftime("%Y-%m-%d %H:%M:%S")
                     else:
                         processed_at = ""
-                    self.setItem(row_idx, 16, QTableWidgetItem(processed_at))
+                    self.setItem(row_idx, 18, QTableWidgetItem(processed_at))
                 except Exception as row_error:
                     for col in range(self.columnCount()):
                         self.setItem(row_idx, col, QTableWidgetItem(""))
@@ -303,40 +335,39 @@ class ShipmentRequestTable(QTableWidget):
             self._emit_selection_changed()
     
     def _emit_selection_changed(self, is_bulk_update: bool = False):
-        """선택된 항목 변경 시그널 발생"""
+        """선택된 항목 변경 시그널 발생 (테이블 정렬 순서 반영)"""
         selected_items = []
         selected_count = 0
-        
+        # 테이블의 현재 row 순서대로 순회
         for row in range(self.rowCount()):
             checkbox_widget = self.cellWidget(row, 0)
-            
             if checkbox_widget:
                 checkbox = checkbox_widget.findChild(QCheckBox)
-                
                 if checkbox and checkbox.isChecked():
                     selected_count += 1
                     try:
-                        # 각 컬럼의 데이터 확인
+                        # 각 컬럼의 데이터 확인 (전체 row 데이터를 dict로 수집)
+                        item_data = {}
+                        for col in range(self.columnCount()):
+                            header = self.horizontalHeaderItem(col)
+                            key = header.text() if header else str(col)
+                            cell_item = self.item(row, col)
+                            item_data[key] = cell_item.text() if cell_item else None
+                        # id, store_name, purchase_code 등 주요 필드는 기존대로 추가
                         id_item = self.item(row, 2)
                         store_item = self.item(row, 3)
                         purchase_item = self.item(row, 11)
-                        
                         if id_item and store_item and purchase_item:
-                            selected_item = {
-                                "id": int(id_item.text()),
-                                "store_name": store_item.text(),
-                                "purchase_code": purchase_item.text()
-                            }
-                            selected_items.append(selected_item)
-                            
+                            item_data["id"] = int(id_item.text())
+                            item_data["store_name"] = store_item.text()
+                            item_data["purchase_code"] = purchase_item.text()
+                        selected_items.append(item_data)
                     except (ValueError, AttributeError) as e:
                         print(f"행 {row} 데이터 수집 중 오류: {e}")
                         continue
-        
         # 선택된 항목 수 업데이트
         self._update_selection_label()
-        
-        # 시그널 발생
+        # 시그널 발생 (정렬 순서 반영된 selected_items)
         self.selection_changed.emit(selected_items)
     
     def _create_checkbox_widget(self, checkbox):
@@ -422,20 +453,22 @@ class ShipmentRequestTable(QTableWidget):
     def _update_selection_label(self):
         """선택된 항목 수 업데이트"""
         selected_count = sum(1 for row in range(self.rowCount()) if self.cellWidget(row, 0).findChild(QCheckBox).isChecked())
-        self.selection_label.setText(f"선택된 항목: {selected_count}개")
+        self.selection_label.setText(f"선택된 항목: {selected_count:,}개")
 
     def update_status(self, item_ids: List[int], message_status: str, processed_at: str = None):
         """특정 항목들의 메시지 상태와 처리시각만 업데이트"""
         try:
+            if self.rowCount() == 0 or not self.isVisible():
+                return
             for row in range(self.rowCount()):
                 id_item = self.item(row, 2)  # ID 컬럼
-                if id_item:
+                if id_item is None:
+                    continue
                     try:
                         row_id = int(id_item.text())
                         if row_id in item_ids:
-                            # 메시지 상태 업데이트 (컬럼 11)
+                        # 메시지 상태 업데이트 (컬럼 17)
                             message_status_item = QTableWidgetItem(message_status)
-                            
                             # 메시지 상태에 따른 색상 설정
                             if message_status == MessageStatus.SENT.value:
                                 message_status_item.setBackground(QColor(212, 237, 218))  # 연한 초록색
@@ -456,31 +489,23 @@ class ShipmentRequestTable(QTableWidget):
                                 message_status_item.setBackground(QColor(255, 255, 255))  # 흰색
                                 message_status_item.setForeground(QColor(0, 0, 0))        # 검정색
                             
-                            self.setItem(row, 11, message_status_item)
+                        # 인덱스 유효성 체크 후 setItem
+                        if row < self.rowCount() and 17 < self.columnCount():
+                            try:
+                                self.setItem(row, 17, message_status_item)
+                            except Exception as e:
+                                print(f"setItem(row={row}, col=17) 예외: {e}")
                             
-                            # 처리시각 업데이트 (컬럼 12)
-                            if processed_at:
-                                self.setItem(row, 12, QTableWidgetItem(processed_at))
+                        # 처리시각 업데이트 (컬럼 18)
+                        if processed_at and row < self.rowCount() and 18 < self.columnCount():
+                            try:
+                                self.setItem(row, 18, QTableWidgetItem(processed_at))
+                            except Exception as e:
+                                print(f"setItem(row={row}, col=18) 예외: {e}")
                     except ValueError:
                         continue
         except Exception as e:
             print(f"상태 업데이트 중 오류: {str(e)}")
-
-    def _on_filter_changed(self, index):
-        """상태 필터 변경 시 동작"""
-        selected_status = self.status_filter.currentData()
-        if selected_status == "all":
-            # 모든 행 표시
-            for row in range(self.rowCount()):
-                self.setRowHidden(row, False)
-        else:
-            # 선택된 상태와 일치하는 행만 표시
-            for row in range(self.rowCount()):
-                status_item = self.item(row, 11)  # 메시지 상태 컬럼
-                if status_item and status_item.text() == selected_status:
-                    self.setRowHidden(row, False)
-                else:
-                    self.setRowHidden(row, True)
 
     def mousePressEvent(self, event):
         # 하이퍼링크 셀 클릭 시 브라우저로 열기
@@ -492,4 +517,8 @@ class ShipmentRequestTable(QTableWidget):
             item = self.item(index.row(), col)
             if item and item.data(Qt.UserRole):
                 QDesktopServices.openUrl(QUrl(item.data(Qt.UserRole)))
-        super().mousePressEvent(event) 
+        super().mousePressEvent(event)
+
+    def _on_pickup_date_filter_changed(self, idx):
+        if hasattr(self, '_current_data'):
+            self.update_data(self._current_data) 

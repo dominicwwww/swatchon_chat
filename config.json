@@ -61,7 +61,7 @@
           }
         ],
         "order_details_format": "[{quality_name}] | #{color_number} | {quantity}yd | {pickup_at} | {delivery_method}-{logistics_company}",
-        "last_modified": "2025-05-27T18:01:35.108725"
+        "last_modified": "2025-05-30T09:40:35.101079"
       },
       "shipment_confirm": {
         "title": "FBO 출고 확인",

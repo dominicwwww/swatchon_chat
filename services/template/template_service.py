@@ -307,19 +307,33 @@ class TemplateService:
                     field_value = field_value.strftime('%Y-%m-%d')
                 elif isinstance(field_value, str) and "T" in field_value:
                     field_value = field_value.split("T")[0]
+            
+            # 숫자 비교 연산자일 때 int/float 변환 시도
+            if operator in [">", ">=", "<", "<=", "==", "!="]:
+                try:
+                    # 둘 다 숫자라면 변환
+                    fv = float(field_value)
+                    vv = float(value)
+                except (ValueError, TypeError):
+                    fv = field_value
+                    vv = value
+            else:
+                fv = field_value
+                vv = value
+            
             # 연산자에 따른 조건 확인
             if operator == "==":
-                return field_value == value
+                return fv == vv
             elif operator == "!=":
-                return field_value != value
+                return fv != vv
             elif operator == ">":
-                return field_value > value
+                return fv > vv
             elif operator == ">=":
-                return field_value >= value
+                return fv >= vv
             elif operator == "<":
-                return field_value < value
+                return fv < vv
             elif operator == "<=":
-                return field_value <= value
+                return fv <= vv
             elif operator == "in":
                 return value in field_value
             elif operator == "not in":
@@ -435,7 +449,7 @@ class TemplateService:
             
         except Exception as e:
             self.logger.error(f"API 데이터 가져오기 실패: {str(e)}")
-            return None 
+            return None
 
     def evaluate_condition(self, data: dict, condition: dict) -> bool:
         """
@@ -460,18 +474,31 @@ class TemplateService:
         else:
             field_value = data.get(field, "")
 
+        # 숫자 비교 연산자일 때 int/float 변환 시도
+        if operator in [">", ">=", "<", "<=", "==", "!="]:
+            try:
+                # 둘 다 숫자라면 변환
+                fv = float(field_value)
+                vv = float(value)
+            except (ValueError, TypeError):
+                fv = field_value
+                vv = value
+        else:
+            fv = field_value
+            vv = value
+
         # 연산자별 비교
         if operator == "==":
-            return field_value == value
+            return fv == vv
         elif operator == "!=":
-            return field_value != value
+            return fv != vv
         elif operator == ">":
-            return field_value > value
+            return fv > vv
         elif operator == "<":
-            return field_value < value
+            return fv < vv
         elif operator == ">=":
-            return field_value >= value
+            return fv >= vv
         elif operator == "<=":
-            return field_value <= value
+            return fv <= vv
         else:
             return False 
