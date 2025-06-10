@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal, QSize
 from PySide6.QtGui import QIcon, QPixmap
+import qtawesome as qta
 
 from core.types import ThemeMode
 from ui.theme import get_theme
@@ -102,6 +103,14 @@ class ControlBar(QWidget):
         # 왼쪽 여백
         layout.addItem(QSpacerItem(20, 20, QSizePolicy.Expanding, QSizePolicy.Minimum))
         
+        # 업데이트 체크 버튼
+        self.update_check_button = QPushButton()
+        self.update_check_button.setIcon(qta.icon('ph.arrow-clockwise'))
+        self.update_check_button.setToolTip("업데이트 확인")
+        self.update_check_button.setFixedSize(32, 32)
+        self.update_check_button.setCursor(Qt.PointingHandCursor)
+        layout.addWidget(self.update_check_button)
+        
         # 테마 토글 버튼
         self.theme_toggle = ThemeToggleButton()
         self.theme_toggle.clicked.connect(self._on_theme_toggled)
@@ -115,6 +124,10 @@ class ControlBar(QWidget):
         
         # 테마 변경 이벤트 연결
         get_theme().theme_changed.connect(self._update_style)
+    
+    def add_update_check_button(self, callback):
+        """업데이트 체크 버튼 클릭 이벤트 연결"""
+        self.update_check_button.clicked.connect(callback)
     
     def _on_theme_toggled(self, checked):
         """테마 토글 버튼 클릭 이벤트 처리"""
@@ -131,6 +144,22 @@ class ControlBar(QWidget):
     def _update_style(self):
         """테마에 맞게 스타일 업데이트"""
         theme = get_theme()
+        
+        # 업데이트 체크 버튼 스타일
+        self.update_check_button.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {theme.get_color('card_bg')};
+                border: 1px solid {theme.get_color('border')};
+                border-radius: 16px;
+                padding: 4px;
+                color: {theme.get_color('primary')};
+            }}
+            
+            QPushButton:hover {{
+                background-color: {theme.get_color('primary')};
+                color: white;
+            }}
+        """)
         
         # 컨트롤바 스타일
         self.setStyleSheet(f"""

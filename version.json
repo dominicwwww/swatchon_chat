@@ -1,5 +1,5 @@
 {
-    "version": "1.0.2",
-    "update_url": "https://your-update-server.com",
+    "version": "1.0.3",
+    "update_url": "https://github.com/dominicwwww/swatchon-partner-hub/releases/download/v1.0.3/swatchon-partner-hub-1.0.3.exe",
     "release_notes": "버그 수정 및 개선사항"
 } 

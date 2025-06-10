@@ -2,10 +2,13 @@
 메인 윈도우 - 애플리케이션의 메인 윈도우 클래스
 """
 import sys
+import json
+import requests
 from typing import Dict, Optional
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, 
-    QStackedWidget, QApplication, QFrame, QSplitter
+    QStackedWidget, QApplication, QFrame, QSplitter,
+    QMessageBox
 )
 from PySide6.QtCore import Qt, QSize, QTimer
 from PySide6.QtGui import QIcon
@@ -51,6 +54,9 @@ class MainWindow(QMainWindow):
         # 컨트롤 바
         self.control_bar = ControlBar()
         right_layout.addWidget(self.control_bar)
+        
+        # 업데이트 체크 버튼 추가
+        self.control_bar.add_update_check_button(self.check_for_updates)
         
         # 스택 위젯 (내용 영역)
         self.stack_widget = QStackedWidget()
@@ -244,6 +250,40 @@ class MainWindow(QMainWindow):
         except Exception as e:
             print(f"애플리케이션 종료 중 오류: {str(e)}")
             event.accept()  # 오류가 있어도 종료는 허용
+
+    def check_for_updates(self):
+        """업데이트 확인"""
+        try:
+            # 현재 버전 로드
+            with open('version.json', 'r', encoding='utf-8') as f:
+                current_version = json.load(f)['version']
+            
+            # GitHub에서 최신 버전 정보 가져오기
+            response = requests.get('https://raw.githubusercontent.com/dominicwwww/swatchon-partner-hub/main/version.json')
+            if response.status_code == 200:
+                latest_version = response.json()['version']
+                
+                # 버전 비교
+                if latest_version > current_version:
+                    # 업데이트 가능 메시지 표시
+                    msg = QMessageBox()
+                    msg.setIcon(QMessageBox.Information)
+                    msg.setWindowTitle("업데이트 가능")
+                    msg.setText(f"새로운 버전({latest_version})이 있습니다.")
+                    msg.setInformativeText("업데이트를 다운로드하시겠습니까?")
+                    msg.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+                    
+                    if msg.exec_() == QMessageBox.Yes:
+                        # TODO: 업데이트 다운로드 및 설치 로직 구현
+                        pass
+                else:
+                    # 최신 버전 메시지 표시
+                    QMessageBox.information(self, "업데이트 확인", "현재 최신 버전을 사용 중입니다.")
+            else:
+                QMessageBox.warning(self, "업데이트 확인 실패", "서버에서 버전 정보를 가져올 수 없습니다.")
+                
+        except Exception as e:
+            QMessageBox.critical(self, "오류", f"업데이트 확인 중 오류가 발생했습니다: {str(e)}")
 
 def create_app():
     """애플리케이션 및 메인 윈도우 생성"""
