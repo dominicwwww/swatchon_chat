@@ -1,5 +1,5 @@
 {
-    "version": "1.0.0",
+    "version": "1.0.2",
     "update_url": "https://your-update-server.com",
-    "release_notes": "초기 버전"
+    "release_notes": "버그 수정 및 개선사항"
 } 
