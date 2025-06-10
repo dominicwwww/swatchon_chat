@@ -14,4 +14,5 @@ beautifulsoup4==4.11.1  # HTML parsing
 python-dateutil==2.8.2  # Date processing
 pydantic==1.9.1        # Data validation and schema
 typing-extensions==4.2.0 # Type hints extension
-psutil==7.0.0          # Process and system utilities (process management) 
+psutil==7.0.0          # Process and system utilities (process management)
+pyinstaller==6.3.0     # Executable creation 

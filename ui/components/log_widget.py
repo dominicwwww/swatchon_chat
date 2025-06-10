@@ -57,7 +57,8 @@ class LogWidget(QWidget):
         # 로그 텍스트 영역
         self.log_text = QPlainTextEdit()
         self.log_text.setReadOnly(True)
-        self.log_text.setMaximumBlockCount(1000)  # 최대 로그 줄 수 제한
+        self.log_text.setMaximumBlockCount(10000)  # 최대 로그 줄 수 제한
+        self.log_text.setMinimumHeight(400)  # 최소 높이 설정
         
         # 글꼴 설정
         log_font = QFont("Consolas, 'Courier New', monospace")

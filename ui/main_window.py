@@ -31,7 +31,7 @@ class MainWindow(QMainWindow):
         
         # 윈도우 설정
         self.setWindowTitle("SwatchOn Partner Hub")
-        self.setMinimumSize(1200, 800)
+        self.setMinimumSize(1200, 1200)
         
         # 메인 위젯
         main_widget = QWidget()

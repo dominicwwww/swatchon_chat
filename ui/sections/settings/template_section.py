@@ -434,9 +434,26 @@ class TemplateSection(BaseSection):
         self.conditions_table.setRowCount(len(conditions))
         
         for row, condition in enumerate(conditions):
-            self.conditions_table.setItem(row, 0, QTableWidgetItem(condition.get("field", "")))
+            # 이전 형식 (field)과 새로운 형식 (fields) 모두 처리
+            if "fields" in condition:
+                fields = condition["fields"]
+                if isinstance(fields, list):
+                    field_text = ", ".join(fields)
+                else:
+                    field_text = str(fields)
+            else:
+                field_text = condition.get("field", "")
+            
+            # 값 처리
+            value = condition.get("value", "")
+            if isinstance(value, dict):
+                value_text = ", ".join(f"{k}: {v}" for k, v in value.items())
+            else:
+                value_text = str(value)
+            
+            self.conditions_table.setItem(row, 0, QTableWidgetItem(field_text))
             self.conditions_table.setItem(row, 1, QTableWidgetItem(condition.get("operator", "")))
-            self.conditions_table.setItem(row, 2, QTableWidgetItem(str(condition.get("value", ""))))
+            self.conditions_table.setItem(row, 2, QTableWidgetItem(value_text))
             self.conditions_table.setItem(row, 3, QTableWidgetItem(condition.get("template", "")))
     
     # 새로운 버튼 이벤트 핸들러들

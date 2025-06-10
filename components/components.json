@@ -1,0 +1,33 @@
+{
+    "version": "1.0.0",
+    "components": [
+        {
+            "name": "core-chat",
+            "version": "1.0.0",
+            "path": "core/chat",
+            "dependencies": [],
+            "description": "채팅 핵심 모듈"
+        },
+        {
+            "name": "core-auth",
+            "version": "1.0.0",
+            "path": "core/auth",
+            "dependencies": [],
+            "description": "인증 핵심 모듈"
+        },
+        {
+            "name": "ui-windows",
+            "version": "1.0.0",
+            "path": "ui/windows",
+            "dependencies": ["core-chat"],
+            "description": "UI 윈도우 모듈"
+        },
+        {
+            "name": "service-kakao",
+            "version": "1.0.0",
+            "path": "services/kakao",
+            "dependencies": ["core-auth"],
+            "description": "카카오톡 서비스 모듈"
+        }
+    ]
+} 

@@ -199,13 +199,24 @@ class TemplateService:
             # 조건부 템플릿 적용
             if "conditions" in template:
                 for condition in template["conditions"]:
-                    field = condition["field"]
-                    operator = condition["operator"]
-                    value = condition["value"]
-                    condition_content = condition.get("template", "")
-                    if self._evaluate_condition(data, field, operator, value):
-                        content = condition_content
-                        break
+                    # fields가 있으면 다중 필드 조건으로 처리
+                    if "fields" in condition:
+                        fields = condition["fields"]
+                        operator = condition["operator"]
+                        value = condition["value"]
+                        condition_content = condition.get("template", "")
+                        if self._evaluate_multi_field_condition(data, fields, operator, value):
+                            content = condition_content
+                            break
+                    # 이전 버전 호환성을 위해 field도 처리
+                    elif "field" in condition:
+                        field = condition["field"]
+                        operator = condition["operator"]
+                        value = condition["value"]
+                        condition_content = condition.get("template", "")
+                        if self._evaluate_condition(data, field, operator, value):
+                            content = condition_content
+                            break
             
             # 모든 변수를 문자열로 변환하여 치환
             for key, value in data.items():
@@ -345,6 +356,122 @@ class TemplateService:
             return False
         except Exception as e:
             self.logger.error(f"조건 평가 중 오류: {str(e)}")
+            return False
+
+    def _evaluate_multi_field_condition(self, data: Dict[str, Any], fields: List[str], operator: str, value: Any) -> bool:
+        """
+        다중 필드 조건 평가
+        
+        Args:
+            data: 변수 데이터
+            fields: 필드명 리스트
+            operator: 연산자
+            value: 비교값 (단일 값 또는 필드별 값 딕셔너리)
+            
+        Returns:
+            bool: 조건 만족 여부
+        """
+        try:
+            # 모든 필드가 데이터에 있는지 확인
+            if not all(field in data for field in fields):
+                return False
+
+            # 각 필드의 값을 가져와서 리스트로 만듦
+            field_values = []
+            for field in fields:
+                field_value = data[field]
+                # pickup_at이 datetime 또는 ISO 문자열이면 YYYY-MM-DD로 변환
+                if field == "pickup_at":
+                    if isinstance(field_value, datetime):
+                        field_value = field_value.strftime('%Y-%m-%d')
+                    elif isinstance(field_value, str) and "T" in field_value:
+                        field_value = field_value.split("T")[0]
+                field_values.append((field, field_value))
+
+            # {today} 지원
+            if isinstance(value, str) and value.strip() == "{today}":
+                value = datetime.now().strftime('%Y-%m-%d')
+
+            # value가 딕셔너리인 경우 (필드별 다른 값)
+            if isinstance(value, dict):
+                results = []
+                for field, field_value in field_values:
+                    if field not in value:
+                        continue
+                    target_value = value[field]
+                    
+                    # 숫자 비교 연산자일 때 int/float 변환 시도
+                    if operator in [">", ">=", "<", "<=", "==", "!="]:
+                        try:
+                            fv = float(field_value)
+                            tv = float(target_value)
+                        except (ValueError, TypeError):
+                            fv = field_value
+                            tv = target_value
+                    else:
+                        fv = field_value
+                        tv = target_value
+
+                    # 연산자에 따른 조건 확인
+                    if operator == "==":
+                        results.append(fv == tv)
+                    elif operator == "!=":
+                        results.append(fv != tv)
+                    elif operator == ">":
+                        results.append(fv > tv)
+                    elif operator == ">=":
+                        results.append(fv >= tv)
+                    elif operator == "<":
+                        results.append(fv < tv)
+                    elif operator == "<=":
+                        results.append(fv <= tv)
+                    elif operator == "in":
+                        results.append(tv in fv)
+                    elif operator == "not in":
+                        results.append(tv not in fv)
+                    elif operator == "contains":
+                        results.append(str(tv) in str(fv))
+                    elif operator == "not contains":
+                        results.append(str(tv) not in str(fv))
+                
+                return all(results)
+            
+            # 단일 값과 비교하는 경우 (기존 로직)
+            else:
+                # 숫자 비교 연산자일 때 int/float 변환 시도
+                if operator in [">", ">=", "<", "<=", "==", "!="]:
+                    try:
+                        field_values = [float(v) for _, v in field_values]
+                        vv = float(value)
+                    except (ValueError, TypeError):
+                        field_values = [v for _, v in field_values]
+                        vv = value
+
+                # 연산자에 따른 조건 확인
+                if operator == "==":
+                    return all(fv == vv for _, fv in field_values)
+                elif operator == "!=":
+                    return all(fv != vv for _, fv in field_values)
+                elif operator == ">":
+                    return all(fv > vv for _, fv in field_values)
+                elif operator == ">=":
+                    return all(fv >= vv for _, fv in field_values)
+                elif operator == "<":
+                    return all(fv < vv for _, fv in field_values)
+                elif operator == "<=":
+                    return all(fv <= vv for _, fv in field_values)
+                elif operator == "in":
+                    return all(value in fv for _, fv in field_values)
+                elif operator == "not in":
+                    return all(value not in fv for _, fv in field_values)
+                elif operator == "contains":
+                    return all(str(value) in str(fv) for _, fv in field_values)
+                elif operator == "not contains":
+                    return all(str(value) not in str(fv) for _, fv in field_values)
+                return False
+                
+        except Exception as e:
+            self.logger.error(f"다중 필드 조건 평가 중 오류: {str(e)}")
             return False
     
     def get_template_variables(self, order_type: OrderType, 

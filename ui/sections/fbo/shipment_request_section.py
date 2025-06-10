@@ -6,10 +6,10 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, 
     QFrame, QMessageBox, QApplication
 )
-from PySide6.QtCore import Qt, Signal, QTimer
+from PySide6.QtCore import Qt, Signal, QTimer, QMarginsF
 from PySide6.QtGui import QFont
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from core.types import OrderType, FboOperationType, ShipmentStatus, MessageStatus
 from ui.sections.base_section import BaseSection
@@ -74,6 +74,7 @@ class ShipmentRequestSection(BaseSection):
         
         # 선택된 항목 추적
         self._selected_items: List[PurchaseProduct] = []
+        self._preview_ready = False  # 미리보기 상태 플래그
     
     def setup_components(self):
         """컴포넌트 초기화 및 연결"""
@@ -175,8 +176,57 @@ class ShipmentRequestSection(BaseSection):
         """메시지 미리보기 생성 완료 이벤트"""
         self.log("메시지 미리보기가 생성되었습니다.", LOG_SUCCESS)
         self.send_button.setEnabled(True)
-        self.preview_button.setText("📋 미리보기 완료")
+        self.preview_button.setText("📋 메시지 미리보기")
         self.log("💡 '메시지 전송' 버튼을 클릭하여 실제 전송하거나, 다른 항목을 선택하여 새로운 미리보기를 생성하세요.", LOG_INFO)
+        
+        # quantity가 50 이상인 아이템 필터링
+        large_quantity_items = [
+            item for item in self._selected_items
+            if isinstance(item.quantity, (int, float)) and item.quantity >= 50
+        ]
+        
+        if large_quantity_items:
+            # swatch_storage 기준으로 정렬
+            sorted_items = sorted(large_quantity_items, key=lambda x: str(x.swatch_storage or ""))
+            
+            # 보관함이 있는 항목만 카운트
+            storage_items = [item for item in large_quantity_items if item.swatch_storage]
+            product_count = len(storage_items)
+            unique_qualities = len(set(item.quality_code for item in storage_items if item.quality_code))
+            
+            # pickup_at이 가장 빠른 날짜의 형식으로 헤더 생성 (하루 더하기)
+            if sorted_items:
+                from datetime import timedelta
+                first_pickup = sorted_items[0].pickup_at + timedelta(days=1)
+                header_date = first_pickup.strftime('%m/%d')
+                self.log(f"\n[{header_date} 50yd 이상 입고 예정: {product_count} 프로덕트 / {unique_qualities} 퀄리티]", LOG_INFO)
+                self.log("스와치 보관함 (스와치 제공 여부) - 퀄리티 (컬러 순서) - 발주번호 - 주문번호 - 판매자 - 수량", LOG_INFO)
+                self.log("\n", LOG_INFO)  # 빈 줄 추가
+            
+            for idx, item in enumerate(sorted_items, 1):
+                # swatch_storage 표시
+                storage_display = str(item.swatch_storage) if item.swatch_storage else "None"
+                if not item.swatch_storage:
+                    pickupable = "O" if item.swatch_pickupable else "X"
+                    storage_display += f" ({pickupable})"
+                
+                # quality_code와 color_number 표시
+                quality_with_color = f"{item.quality_code or 'N/A'}"
+                if item.color_number:
+                    quality_with_color += f" ({item.color_number})"
+                
+                log_message = (
+                    f"{idx}) {storage_display} - "
+                    f"{quality_with_color} - "
+                    f"{item.purchase_code} - "
+                    f"{item.order_code or 'N/A'} - "
+                    f"{item.store_name} - "
+                    f"{item.quantity}yd"
+                )
+                self.log(log_message, LOG_INFO)
+            
+            # 고유한 quality_code 개수 계산 (보관함 있는 항목 기준)
+            self.log(f"\n컬러 검수를 위해 총 {unique_qualities} 퀄리티의 스와치를 준비해주시기 바랍니다~!", LOG_INFO)
     
     def _on_message_sent(self, result: Dict[str, Any]):
         """메시지 전송 완료 이벤트"""
@@ -300,36 +350,90 @@ class ShipmentRequestSection(BaseSection):
             QMessageBox.critical(self, "오류", f"주소록 새로고침 중 오류가 발생했습니다:\n{str(e)}")
     
     def _on_preview_clicked(self):
-        """미리보기 버튼 클릭 이벤트"""
-        if not self._selected_items:
-            QMessageBox.warning(self, "선택 오류", "선택된 항목이 없습니다.")
-            return
-        
-        # 중복 전송 검증
-        selected_items_dict = [self._purchase_product_to_dict(item) for item in self._selected_items]
-        duplicate_check = self.message_manager.check_duplicate_sending(
-            selected_items_dict,
-            self.data_manager.get_all_data()
-        )
-        
-        if duplicate_check.get('has_duplicates', False):
-            duplicates = duplicate_check.get('duplicates', {})
-            duplicate_info = []
-            for seller_name, info in duplicates.items():
-                duplicate_info.append(f"• {seller_name}: 이미 전송된 {info['sent_count']}건, 대기 중 {info['pending_count']}건")
+        """미리보기/출력 버튼 클릭 이벤트"""
+        if not self._preview_ready:
+            # 1. 메시지 미리보기 클릭 시: 로그 출력, 레이블 변경
+            if not self._selected_items:
+                QMessageBox.warning(self, "선택 오류", "선택된 항목이 없습니다.")
+                return
             
-            message = "다음 판매자들에게 이미 전송된 메시지가 있습니다:\n\n" + "\n".join(duplicate_info) + "\n\n계속 진행하시겠습니까?"
-            
-            reply = QMessageBox.question(
-                self, "중복 전송 확인", message,
-                QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+            # 중복 전송 검증
+            selected_items_dict = [self._purchase_product_to_dict(item) for item in self._selected_items]
+            duplicate_check = self.message_manager.check_duplicate_sending(
+                selected_items_dict,
+                self.data_manager.get_all_data()
             )
             
-            if reply != QMessageBox.Yes:
-                return
-        
-        # 메시지 미리보기 생성
-        self.message_manager.generate_message_preview(selected_items_dict)
+            if duplicate_check.get('has_duplicates', False):
+                duplicates = duplicate_check.get('duplicates', {})
+                duplicate_info = []
+                for seller_name, info in duplicates.items():
+                    duplicate_info.append(f"• {seller_name}: 이미 전송된 {info['sent_count']}건, 대기 중 {info['pending_count']}건")
+                
+                message = "다음 판매자들에게 이미 전송된 메시지가 있습니다:\n\n" + "\n".join(duplicate_info) + "\n\n계속 진행하시겠습니까?"
+                
+                reply = QMessageBox.question(
+                    self, "중복 전송 확인", message,
+                    QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+                )
+                
+                if reply != QMessageBox.Yes:
+                    return
+            
+            # 메시지 미리보기 생성
+            self.message_manager.generate_message_preview(selected_items_dict)
+            self.log("메시지 미리보기가 생성되었습니다.", LOG_SUCCESS)
+            self.log("💡 '스와치 보관함 출력' 버튼을 클릭하면 인쇄 미리보기가 열립니다.", LOG_INFO)
+            self._preview_ready = True
+            self.preview_button.setText("스와치 보관함 출력")
+        else:
+            # 2. 스와치 보관함 출력 클릭 시: 인쇄 미리보기 창
+            from PySide6.QtPrintSupport import QPrinter, QPrintPreviewDialog
+            from PySide6.QtGui import QTextDocument
+            from PySide6.QtCore import QMarginsF
+            printer = QPrinter()
+            printer.setPageMargins(QMarginsF(0, 0, 0, 0))
+            preview = QPrintPreviewDialog(printer, self)
+            large_quantity_items = [
+                item for item in self._selected_items
+                if isinstance(item.quantity, (int, float)) and item.quantity >= 50
+            ]
+            if large_quantity_items:
+                sorted_items = sorted(large_quantity_items, key=lambda x: str(x.swatch_storage or ""))
+                # 보관함이 있는 항목만 카운트
+                storage_items = [item for item in large_quantity_items if item.swatch_storage]
+                product_count = len(storage_items)
+                unique_qualities = len(set(item.quality_code for item in storage_items if item.quality_code))
+                html = []
+                if sorted_items:
+                    from datetime import timedelta
+                    first_pickup = sorted_items[0].pickup_at + timedelta(days=1)
+                    header_date = first_pickup.strftime('%m/%d')
+                    html.append(f"<h2 style='color:#000;'>[{header_date}] 50yd 이상 입고 예정: {product_count} 프로덕트 / {unique_qualities} 퀄리티</h2>")
+                    html.append("<p style='color:#000;'>스와치 보관함 (스와치 제공 여부) - 퀄리티 (컬러 순서) - 발주번호 - 판매자 - 수량</p>")
+                    html.append("<br>")
+                for idx, item in enumerate(sorted_items, 1):
+                    storage_display = str(item.swatch_storage) if item.swatch_storage else "None"
+                    if not item.swatch_storage:
+                        pickupable = "O" if item.swatch_pickupable else "X"
+                        storage_display += f" ({pickupable})"
+                    quality_with_color = f"{item.quality_code or 'N/A'}"
+                    if item.color_number:
+                        quality_with_color += f" ({item.color_number})"
+                    html.append(
+                        f"<span style='color:#000;'>{idx}) {storage_display} - "
+                        f"{quality_with_color} - "
+                        f"{item.purchase_code} - "
+                        f"{item.store_name} - "
+                        f"{item.quantity}yd</span>"
+                    )
+                document = QTextDocument()
+                document.setHtml("<br>".join(html))
+                preview.paintRequested.connect(document.print_)
+                preview.exec()
+                self.log("스와치 보관함 미리보기/인쇄가 완료되었습니다.", LOG_SUCCESS)
+            self._preview_ready = False
+            self.preview_button.setText("📋 메시지 미리보기")
     
     def _on_send_clicked(self):
         """메시지 전송 버튼 클릭 이벤트"""
