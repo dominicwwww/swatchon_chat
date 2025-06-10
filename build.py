@@ -13,7 +13,7 @@ def build():
         '--name=SwatchonChat',  # 실행 파일 이름
         '--onefile',  # 단일 실행 파일로 생성
         '--noconsole',  # 콘솔 창 숨기기
-        '--icon=resources/icon.ico',  # 아이콘 (있는 경우)
+        '--icon=resources/swatchon.ico',  # 아이콘 (있는 경우)
         '--add-data=version.json;.',  # 버전 정보 파일 포함
         '--add-data=config.json;.',  # 설정 파일 포함
         '--add-data=resources;resources',  # 리소스 폴더 포함

@@ -6,7 +6,8 @@
             "version": "1.0.0",
             "path": "core/chat",
             "dependencies": [],
-            "description": "채팅 핵심 모듈"
+            "description": "채팅 핵심 모듈",
+            "hash": "90060d456fc17d1ee0253f9b984867b12e611f7fa98d23c060b0aa76f4380463"
         },
         {
             "name": "core-auth",
@@ -19,15 +20,20 @@
             "name": "ui-windows",
             "version": "1.0.0",
             "path": "ui/windows",
-            "dependencies": ["core-chat"],
+            "dependencies": [
+                "core-chat"
+            ],
             "description": "UI 윈도우 모듈"
         },
         {
             "name": "service-kakao",
             "version": "1.0.0",
             "path": "services/kakao",
-            "dependencies": ["core-auth"],
-            "description": "카카오톡 서비스 모듈"
+            "dependencies": [
+                "core-auth"
+            ],
+            "description": "카카오톡 서비스 모듈",
+            "hash": "598da3f3d14394b5e155cfb556e428a17927117cbcca150d69e45c1a6fe44f4b"
         }
     ]
-} 
+}
