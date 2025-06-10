@@ -254,17 +254,28 @@ class MainWindow(QMainWindow):
     def check_for_updates(self):
         """업데이트 확인"""
         try:
+            print("[업데이트 확인] 시작")
+            self.log("[업데이트 확인] 시작", "info")
             # 현재 버전 로드
             with open('version.json', 'r', encoding='utf-8') as f:
                 current_version = json.load(f)['version']
-            
-            # GitHub에서 최신 버전 정보 가져오기
-            response = requests.get('https://raw.githubusercontent.com/dominicwwww/swatchon-partner-hub/main/version.json')
+            print(f"[업데이트 확인] 현재 버전: {current_version}")
+            self.log(f"[업데이트 확인] 현재 버전: {current_version}", "info")
+
+            # GitHub에서 최신 버전 정보 가져오기 (정확한 경로로 수정)
+            response = requests.get('https://raw.githubusercontent.com/dominicwwww/swatchon_chat/refs/heads/main/version.json')
+            print(f"[업데이트 확인] 서버 응답 코드: {response.status_code}")
+            self.log(f"[업데이트 확인] 서버 응답 코드: {response.status_code}", "debug")
+
             if response.status_code == 200:
                 latest_version = response.json()['version']
-                
+                print(f"[업데이트 확인] 최신 버전: {latest_version}")
+                self.log(f"[업데이트 확인] 최신 버전: {latest_version}", "info")
+
                 # 버전 비교
                 if latest_version > current_version:
+                    print("[업데이트 확인] 새로운 버전이 있습니다.")
+                    self.log("[업데이트 확인] 새로운 버전이 있습니다.", "success")
                     # 업데이트 가능 메시지 표시
                     msg = QMessageBox()
                     msg.setIcon(QMessageBox.Information)
@@ -272,18 +283,33 @@ class MainWindow(QMainWindow):
                     msg.setText(f"새로운 버전({latest_version})이 있습니다.")
                     msg.setInformativeText("업데이트를 다운로드하시겠습니까?")
                     msg.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
-                    
+
                     if msg.exec_() == QMessageBox.Yes:
+                        print("[업데이트 확인] 사용자가 업데이트를 선택함")
+                        self.log("[업데이트 확인] 사용자가 업데이트를 선택함", "info")
                         # TODO: 업데이트 다운로드 및 설치 로직 구현
                         pass
                 else:
-                    # 최신 버전 메시지 표시
+                    print("[업데이트 확인] 이미 최신 버전입니다.")
+                    self.log("[업데이트 확인] 이미 최신 버전입니다.", "success")
                     QMessageBox.information(self, "업데이트 확인", "현재 최신 버전을 사용 중입니다.")
             else:
+                print(f"[업데이트 확인] 서버 응답 코드: {response.status_code}, 내용: {response.text}")
+                self.log(f"[업데이트 확인] 서버 응답 코드: {response.status_code}, 내용: {response.text}", "error")
                 QMessageBox.warning(self, "업데이트 확인 실패", "서버에서 버전 정보를 가져올 수 없습니다.")
-                
+
         except Exception as e:
+            print(f"[업데이트 확인 예외] {e}")
+            self.log(f"[업데이트 확인 예외] {e}", "error")
             QMessageBox.critical(self, "오류", f"업데이트 확인 중 오류가 발생했습니다: {str(e)}")
+
+    def log(self, message: str, log_type: str = "info"):
+        """현재 활성 섹션에 로그 메시지 전달"""
+        current_widget = self.stack_widget.currentWidget()
+        if hasattr(current_widget, "log"):
+            current_widget.log(message, log_type)
+        else:
+            print(f"[LOG][{log_type}] {message}")
 
 def create_app():
     """애플리케이션 및 메인 윈도우 생성"""
