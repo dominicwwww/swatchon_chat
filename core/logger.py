@@ -23,6 +23,27 @@ LOG_LEVELS = {
 # 기본 로그 레벨
 DEFAULT_LOG_LEVEL = logging.INFO
 
+# 로그 최대 길이 제한
+MAX_LOG_LENGTH = 1000
+
+class TruncatingFormatter(logging.Formatter):
+    """로그 메시지 길이를 제한하는 포매터"""
+    
+    def format(self, record):
+        # 원본 메시지 저장
+        original_msg = record.msg
+        
+        # 메시지가 너무 길면 잘라내기
+        if len(str(record.msg)) > MAX_LOG_LENGTH:
+            record.msg = str(record.msg)[:MAX_LOG_LENGTH] + "... (생략됨)"
+        
+        # 포맷팅
+        result = super().format(record)
+        
+        # 원본 메시지 복원
+        record.msg = original_msg
+        
+        return result
 
 def _get_log_dir() -> str:
     """로그 디렉토리 경로 반환"""
@@ -36,13 +57,11 @@ def _get_log_dir() -> str:
     
     return log_dir
 
-
 def _get_log_file() -> str:
     """현재 날짜의 로그 파일 경로 반환"""
     log_dir = _get_log_dir()
     today = datetime.now().strftime("%Y-%m-%d")
     return os.path.join(log_dir, f"swatchon_{today}.log")
-
 
 def get_logger(name: str, level: Optional[str] = None) -> logging.Logger:
     """
@@ -68,14 +87,14 @@ def get_logger(name: str, level: Optional[str] = None) -> logging.Logger:
     # 콘솔 핸들러 추가
     console_handler = logging.StreamHandler()
     console_handler.setLevel(log_level)
-    console_formatter = logging.Formatter(LOG_FORMAT, LOG_DATE_FORMAT)
+    console_formatter = TruncatingFormatter(LOG_FORMAT, LOG_DATE_FORMAT)
     console_handler.setFormatter(console_formatter)
     logger.addHandler(console_handler)
     
     # 파일 핸들러 추가
     file_handler = logging.FileHandler(_get_log_file(), encoding='utf-8')
     file_handler.setLevel(log_level)
-    file_formatter = logging.Formatter(LOG_FORMAT, LOG_DATE_FORMAT)
+    file_formatter = TruncatingFormatter(LOG_FORMAT, LOG_DATE_FORMAT)
     file_handler.setFormatter(file_formatter)
     logger.addHandler(file_handler)
     

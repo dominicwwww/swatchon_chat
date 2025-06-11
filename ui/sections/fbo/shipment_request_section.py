@@ -9,6 +9,8 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, Signal, QTimer, QMarginsF
 from PySide6.QtGui import QFont
 import os
+import sys
+import traceback
 from datetime import datetime, timedelta
 
 from core.types import OrderType, FboOperationType, ShipmentStatus, MessageStatus
@@ -203,6 +205,7 @@ class ShipmentRequestSection(BaseSection):
                 self.log("스와치 보관함 (스와치 제공 여부) - 퀄리티 (컬러 순서) - 발주번호 - 주문번호 - 판매자 - 수량", LOG_INFO)
                 self.log("\n", LOG_INFO)  # 빈 줄 추가
             
+            # 50야드 이상 항목은 모두 표시
             for idx, item in enumerate(sorted_items, 1):
                 # swatch_storage 표시
                 storage_display = str(item.swatch_storage) if item.swatch_storage else "None"
@@ -227,29 +230,57 @@ class ShipmentRequestSection(BaseSection):
             
             # 고유한 quality_code 개수 계산 (보관함 있는 항목 기준)
             self.log(f"\n컬러 검수를 위해 총 {unique_qualities} 퀄리티의 스와치를 준비해주시기 바랍니다~!", LOG_INFO)
+            
+            # 판매자별 메시지 미리보기는 3개만 표시
+            store_messages = preview_data.get("store_messages", [])
+            if store_messages:
+                self.log("\n=== 메시지 미리보기 (3개 판매자) ===", LOG_INFO)
+                import random
+                sample_stores = random.sample(store_messages, min(3, len(store_messages)))
+                
+                for store_msg in sample_stores:
+                    self.log(f"\n--- [{store_msg['store_name']}] → [{store_msg['store_name']}] ---", LOG_INFO)
+                    self.log(f"[출고 요청-{store_msg['store_name']}]", LOG_INFO)
+                    self.log(store_msg["message"], LOG_INFO)
+                
+                if len(store_messages) > 3:
+                    self.log(f"\n... 외 {len(store_messages) - 3}개 판매자 메시지 생략됨", LOG_INFO)
+                
+                self.log("\n=== 미리보기 완료 ===", LOG_INFO)
     
     def _on_message_sent(self, result: Dict[str, Any]):
         """메시지 전송 완료 이벤트"""
-        success_count = result.get('success_count', 0)
-        fail_count = result.get('fail_count', 0)
-        cancelled_count = result.get('cancelled_count', 0)
-        emergency_stop = result.get('emergency_stop', False)
-        
-        if emergency_stop:
-            self.log(f"긴급 정지로 전송 중단: 성공 {success_count}건, 실패 {fail_count}건, 취소 {cancelled_count}건", LOG_WARNING)
-            QMessageBox.information(self, "전송 중단", 
-                f"긴급 정지로 인해 전송이 중단되었습니다.\n성공: {success_count}건, 실패: {fail_count}건, 취소: {cancelled_count}건")
-        else:
-            self.log(f"메시지 전송 완료: 성공 {success_count}건, 실패 {fail_count}건", LOG_SUCCESS)
-            QMessageBox.information(self, "전송 완료", 
-                f"메시지 전송이 완료되었습니다.\n성공: {success_count}건, 실패: {fail_count}건")
-        
-        # 통계 및 테이블 업데이트
-        self._update_all_statistics()
-        self.table.update_data(self.data_manager.get_filtered_data())
-        
-        # 버튼 상태 초기화
-        self._reset_send_button_state()
+        try:
+            success_count = result.get('success_count', 0)
+            fail_count = result.get('fail_count', 0)
+            cancelled_count = result.get('cancelled_count', 0)
+            emergency_stop = result.get('emergency_stop', False)
+            
+            # 전송 결과 로그
+            self.log("\n=== 메시지 전송 결과 ===", LOG_INFO)
+            self.log(f"종료 시간: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", LOG_INFO)
+            
+            if emergency_stop:
+                self.log(f"긴급 정지로 전송 중단: 성공 {success_count}건, 실패 {fail_count}건, 취소 {cancelled_count}건", LOG_WARNING)
+                QMessageBox.information(self, "전송 중단", 
+                    f"긴급 정지로 인해 전송이 중단되었습니다.\n성공: {success_count}건, 실패: {fail_count}건, 취소: {cancelled_count}건")
+            else:
+                self.log(f"메시지 전송 완료: 성공 {success_count}건, 실패 {fail_count}건", LOG_SUCCESS)
+                QMessageBox.information(self, "전송 완료", 
+                    f"메시지 전송이 완료되었습니다.\n성공: {success_count}건, 실패: {fail_count}건")
+            
+            # 통계 및 테이블 업데이트
+            self._update_all_statistics()
+            self.table.update_data(self.data_manager.get_filtered_data())
+            
+            # 버튼 상태 초기화
+            self._reset_send_button_state()
+            
+        except Exception as e:
+            error_msg = f"전송 완료 처리 중 오류 발생: {str(e)}\n{traceback.format_exc()}"
+            self.log(error_msg, LOG_ERROR)
+            QMessageBox.critical(self, "오류", error_msg)
+            self._reset_send_button_state()
     
     def _on_search_changed(self, search_text: str):
         """검색어 변경 이벤트"""
@@ -448,15 +479,27 @@ class ShipmentRequestSection(BaseSection):
         )
         
         if reply == QMessageBox.Yes:
-            # 버튼 상태 변경
-            self.send_button.setEnabled(False)
-            self.send_button.setText("전송 중...")
-            self.emergency_stop_button.setEnabled(True)
-            
-            # 메시지 전송
-            self.message_manager.send_messages(
-                update_status_callback=self._update_item_status
-            )
+            try:
+                # 버튼 상태 변경
+                self.send_button.setEnabled(False)
+                self.send_button.setText("전송 중...")
+                self.emergency_stop_button.setEnabled(True)
+                
+                # 메시지 전송 시작 전 로그 초기화
+                self.log("\n=== 메시지 전송 시작 ===", LOG_INFO)
+                self.log(f"선택된 항목 수: {len(self._selected_items)}", LOG_INFO)
+                self.log(f"시작 시간: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", LOG_INFO)
+                self.log("=" * 50, LOG_INFO)
+                
+                # 메시지 전송
+                self.message_manager.send_messages(
+                    update_status_callback=self._update_item_status
+                )
+            except Exception as e:
+                error_msg = f"메시지 전송 중 오류 발생: {str(e)}\n{traceback.format_exc()}"
+                self.log(error_msg, LOG_ERROR)
+                QMessageBox.critical(self, "전송 오류", error_msg)
+                self._reset_send_button_state()
     
     def _on_emergency_stop_clicked(self):
         """긴급 정지 버튼 클릭 이벤트"""
@@ -489,7 +532,9 @@ class ShipmentRequestSection(BaseSection):
             # UI 업데이트를 위한 이벤트 처리
             QApplication.processEvents()
         except Exception as e:
-            self.log(f"상태 업데이트 중 오류: {str(e)}", LOG_ERROR)
+            error_msg = f"상태 업데이트 중 오류: {str(e)}\n{traceback.format_exc()}"
+            self.log(error_msg, LOG_ERROR)
+            QMessageBox.critical(self, "상태 업데이트 오류", error_msg)
     
     def _purchase_product_to_dict(self, item: PurchaseProduct) -> Dict[str, Any]:
         """PurchaseProduct 객체를 딕셔너리로 변환"""
@@ -571,11 +616,16 @@ class ShipmentRequestSection(BaseSection):
     
     def _reset_send_button_state(self):
         """전송 버튼 상태 초기화"""
-        self.send_button.setEnabled(False)
-        self.send_button.setText("💌 메시지 전송")
-        self.emergency_stop_button.setEnabled(False)
-        self.preview_button.setText("📋 메시지 미리보기")
-        self.message_manager.clear_preview_data()
+        try:
+            self.send_button.setEnabled(False)
+            self.send_button.setText("💌 메시지 전송")
+            self.emergency_stop_button.setEnabled(False)
+            self.preview_button.setText("📋 메시지 미리보기")
+            self.message_manager.clear_preview_data()
+        except Exception as e:
+            error_msg = f"버튼 상태 초기화 중 오류: {str(e)}\n{traceback.format_exc()}"
+            self.log(error_msg, LOG_ERROR)
+            QMessageBox.critical(self, "오류", error_msg)
     
     def on_section_activated(self):
         """섹션이 활성화될 때 호출"""

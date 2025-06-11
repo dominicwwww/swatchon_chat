@@ -244,12 +244,28 @@ class MainWindow(QMainWindow):
                 except Exception as e:
                     print(f"섹션 비활성화 중 오류: {str(e)}")
             
+            # 메시지 전송 중인 경우 확인
+            for section in self._sections.values():
+                if hasattr(section, 'message_manager') and section.message_manager.is_sending():
+                    reply = QMessageBox.question(
+                        self, "전송 중", 
+                        "메시지 전송이 진행 중입니다. 정말로 종료하시겠습니까?",
+                        QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+                    )
+                    if reply == QMessageBox.No:
+                        event.ignore()
+                        return
+            
             # 종료 이벤트 처리
             event.accept()
+            
+            # QApplication 종료
+            QApplication.quit()
             
         except Exception as e:
             print(f"애플리케이션 종료 중 오류: {str(e)}")
             event.accept()  # 오류가 있어도 종료는 허용
+            QApplication.quit()  # 강제 종료
 
     def check_for_updates(self):
         """업데이트 확인"""

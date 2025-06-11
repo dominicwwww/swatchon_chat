@@ -29,7 +29,17 @@ class MessageSenderThread(QThread):
             result = self.message_manager._send_messages_internal(self.update_status_callback)
             self.finished.emit(result)
         except Exception as e:
-            self.finished.emit({'success': False, 'error': str(e)})
+            import traceback
+            print("\n=== QThread에서 예외 발생 ===")
+            print("타입:", type(e))
+            print("값:", e)
+            traceback.print_exc()
+            print("===========================\n")
+            self.finished.emit({
+                'success': False, 
+                'error': str(e),
+                'traceback': traceback.format_exc()
+            })
 
 class MessageManager(QObject):
     """
@@ -248,9 +258,13 @@ class MessageManager(QObject):
                     seller_groups[seller_name] = []
                 seller_groups[seller_name].append(item)
             
-            self.log(f"=== 메시지 미리보기 ({len(seller_groups)}명의 판매자) ===", LOG_INFO)
+            # 미리보기용으로 3개의 판매자만 선택
+            import random
+            preview_sellers = random.sample(list(seller_groups.items()), min(3, len(seller_groups)))
             
-            # 미리보기 데이터 저장
+            self.log(f"=== 메시지 미리보기 ({len(preview_sellers)}명의 판매자) ===", LOG_INFO)
+            
+            # 미리보기 데이터 저장 (모든 판매자 데이터 저장)
             self._message_preview_data = {}
             
             # 각 판매자별로 메시지 생성
@@ -314,9 +328,11 @@ class MessageManager(QObject):
                             'items': seller_items_copy
                         }
                         
-                        self.log(f"--- [{seller_name}] → [{chat_room_name}] ---", LOG_INFO)
-                        self.log(f"{message}", LOG_INFO)
-                        self.log("", LOG_INFO)  # 빈 줄 추가
+                        # 미리보기용으로 선택된 판매자만 로그 출력
+                        if (seller_name, seller_items) in preview_sellers:
+                            self.log(f"--- [{seller_name}] → [{chat_room_name}] ---", LOG_INFO)
+                            self.log(f"{message}", LOG_INFO)
+                            self.log("", LOG_INFO)  # 빈 줄 추가
                         
                     else:
                         self.log(f"{seller_name} 판매자용 메시지 생성에 실패했습니다.", LOG_ERROR)

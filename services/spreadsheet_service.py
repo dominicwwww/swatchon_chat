@@ -9,7 +9,7 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
 from core.config import ConfigManager
-from core.constants import SpreadsheetConfigKey
+from core.constants import SpreadsheetConfigKey, ConfigKey
 from core.logger import get_logger
 
 class SpreadsheetService:
@@ -29,18 +29,31 @@ class SpreadsheetService:
         """Google Sheets API 서비스 초기화"""
         try:
             # 자격 증명 파일 경로 가져오기
-            creds_path = self.config.get("google_credentials", "")
+            creds_path = self.config.get(SpreadsheetConfigKey.GOOGLE_CREDENTIALS.value, "")
             if not creds_path:
                 self.logger.error("Google API 자격 증명 파일 경로가 설정되지 않았습니다.")
                 return
             
             # 절대 경로 변환
             if not os.path.isabs(creds_path):
-                creds_path = os.path.join(os.getcwd(), creds_path)
+                # 상대 경로인 경우 실행 파일 기준으로 변환
+                exe_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+                creds_path = os.path.join(exe_dir, creds_path)
             
             # 자격 증명 파일이 존재하는지 확인
             if not os.path.exists(creds_path):
                 self.logger.error(f"Google API 자격 증명 파일을 찾을 수 없습니다: {creds_path}")
+                return
+            
+            # 자격 증명 파일 내용 확인
+            try:
+                with open(creds_path, 'r', encoding='utf-8') as f:
+                    json.load(f)  # JSON 형식 검증
+            except json.JSONDecodeError:
+                self.logger.error(f"Google API 자격 증명 파일이 올바른 JSON 형식이 아닙니다: {creds_path}")
+                return
+            except Exception as e:
+                self.logger.error(f"Google API 자격 증명 파일을 읽을 수 없습니다: {str(e)}")
                 return
             
             # 자격 증명 생성
@@ -79,6 +92,7 @@ class SpreadsheetService:
                 # URL에서 ID 추출 시도
                 try:
                     spreadsheet_key = self._extract_spreadsheet_id(spreadsheet_key)
+                    self.logger.debug(f"스프레드시트 ID 추출: {spreadsheet_key}")
                 except ValueError as e:
                     self.logger.error(f"스프레드시트 URL에서 ID를 추출할 수 없습니다: {str(e)}")
                     return []
@@ -88,6 +102,8 @@ class SpreadsheetService:
                 range_str = f"{sheet_name}!{range_name}"
             else:
                 range_str = sheet_name
+            
+            self.logger.debug(f"스프레드시트 데이터 요청: ID={spreadsheet_key}, 범위={range_str}")
             
             # API 호출로 데이터 가져오기
             sheet = self.service.spreadsheets()
@@ -103,6 +119,7 @@ class SpreadsheetService:
                 self.logger.warning(f"스프레드시트에서 데이터를 찾을 수 없습니다: {spreadsheet_key}, 시트: {sheet_name}")
                 return []
             
+            self.logger.debug(f"스프레드시트 데이터 가져오기 성공: {len(values)}행")
             return values
             
         except HttpError as error:

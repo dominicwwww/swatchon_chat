@@ -1,0 +1,37 @@
+name: Build and Release Components (Staging)
+
+on:
+  push:
+    branches:
+      - staging
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Zip core
+        run: zip -r core.zip core
+
+      - name: Zip ui
+        run: zip -r ui.zip ui
+
+      - name: Zip services
+        run: zip -r services.zip services
+
+      - name: Generate components.json
+        run: python scripts/generate_components_json.py ${{ github.run_number }}-staging
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ github.run_number }}-staging
+          name: Release v${{ github.run_number }} (Staging)
+          files: |
+            core.zip
+            ui.zip
+            services.zip
+            components/components.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }} 

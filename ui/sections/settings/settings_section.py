@@ -10,6 +10,8 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal, QSize
 from PySide6.QtGui import QFont, QColor
+import os
+import json
 
 from core.types import LogType, ThemeMode, SectionType
 from ui.sections.base_section import BaseSection
@@ -156,7 +158,13 @@ class SettingsSection(BaseSection):
         # 자격 증명 파일 경로
         self.credentials_path_edit = QLineEdit()
         self.credentials_path_edit.setPlaceholderText("credentials.json 파일 경로")
-        self.credentials_path_edit.setText(self.config_manager.get(ConfigKey.GOOGLE_CREDENTIALS, ""))
+        credentials_path = self.config_manager.get(ConfigKey.GOOGLE_CREDENTIALS.value, "")
+        if credentials_path:
+            # 절대 경로로 변환
+            if not os.path.isabs(credentials_path):
+                exe_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+                credentials_path = os.path.join(exe_dir, credentials_path)
+        self.credentials_path_edit.setText(credentials_path)
         
         credentials_path_layout = QHBoxLayout()
         credentials_path_layout.setSpacing(8)
@@ -218,13 +226,13 @@ class SettingsSection(BaseSection):
         # 주소록 스프레드시트 URL
         self.address_spreadsheet_url = QLineEdit()
         self.address_spreadsheet_url.setPlaceholderText("주소록 스프레드시트 URL을 입력하세요")
-        self.address_spreadsheet_url.setText(self.config_manager.get(ConfigKey.ADDRESS_BOOK_URL, ""))
+        self.address_spreadsheet_url.setText(self.config_manager.get(SpreadsheetConfigKey.ADDRESS_BOOK_URL.value, ""))
         address_layout.addRow("스프레드시트 URL:", self.address_spreadsheet_url)
         
         # 주소록 시트 이름
         self.address_sheet_name = QLineEdit()
         self.address_sheet_name.setPlaceholderText("주소록 시트 이름을 입력하세요")
-        self.address_sheet_name.setText(self.config_manager.get(ConfigKey.ADDRESS_BOOK_SHEET, "주소록"))
+        self.address_sheet_name.setText(self.config_manager.get(SpreadsheetConfigKey.ADDRESS_BOOK_SHEET.value, "주소록"))
         address_layout.addRow("시트 이름:", self.address_sheet_name)
         
         # 테스트 버튼
@@ -480,7 +488,29 @@ class SettingsSection(BaseSection):
             saved_values.append(f"스크래핑 URL: {receive_url}")
             
             # Google API 설정 저장
-            credentials = self.credentials_path_edit.text()
+            credentials = self.credentials_path_edit.text().strip()
+            if credentials:
+                # 절대 경로로 변환
+                if not os.path.isabs(credentials):
+                    exe_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+                    credentials = os.path.join(exe_dir, credentials)
+                
+                # 파일 존재 여부 확인
+                if not os.path.exists(credentials):
+                    self.log(f"Google API 자격 증명 파일을 찾을 수 없습니다: {credentials}", LOG_ERROR)
+                    return
+                
+                # JSON 형식 검증
+                try:
+                    with open(credentials, 'r', encoding='utf-8') as f:
+                        json.load(f)
+                except json.JSONDecodeError:
+                    self.log(f"Google API 자격 증명 파일이 올바른 JSON 형식이 아닙니다: {credentials}", LOG_ERROR)
+                    return
+                except Exception as e:
+                    self.log(f"Google API 자격 증명 파일을 읽을 수 없습니다: {str(e)}", LOG_ERROR)
+                    return
+
             settings_to_save[ConfigKey.GOOGLE_CREDENTIALS.value] = credentials
             saved_values.append(f"Google 자격증명: {credentials}")
             
@@ -489,20 +519,19 @@ class SettingsSection(BaseSection):
             saved_values.append(f"API 제한: {api_limit}")
             
             # 주소록 설정 저장
-            address_url = self.address_spreadsheet_url.text()
-            settings_to_save[ConfigKey.ADDRESS_BOOK_URL.value] = address_url
+            address_url = self.address_spreadsheet_url.text().strip()
+            settings_to_save[SpreadsheetConfigKey.ADDRESS_BOOK_URL.value] = address_url
             saved_values.append(f"주소록 URL: {address_url}")
             
-            address_sheet = self.address_sheet_name.text()
-            settings_to_save[ConfigKey.ADDRESS_BOOK_SHEET.value] = address_sheet
+            address_sheet = self.address_sheet_name.text().strip()
+            settings_to_save[SpreadsheetConfigKey.ADDRESS_BOOK_SHEET.value] = address_sheet
             saved_values.append(f"주소록 시트: {address_sheet}")
             
             # 기능별 스프레드시트 설정 저장
-            # 테이블에서 각 행의 데이터 저장
             row = 0
             for section_key, section_data in SECTION_SPREADSHEET_MAPPING.items():
-                spreadsheet_url = self.sheet_table.item(row, 1).text()
-                sheet_name = self.sheet_table.item(row, 2).text()
+                spreadsheet_url = self.sheet_table.item(row, 1).text().strip()
+                sheet_name = self.sheet_table.item(row, 2).text().strip()
                 
                 # 설정 저장 - 문자열 키를 직접 사용
                 url_key = section_data["url_key"]
@@ -519,13 +548,17 @@ class SettingsSection(BaseSection):
             print("모든 설정을 일괄 저장합니다...")
             self.config_manager.set_batch(settings_to_save)
             
+            # 설정 파일 저장 확인
+            if not self.config_manager.save():
+                raise Exception("설정 파일 저장에 실패했습니다.")
+            
             # 저장된 설정 로그에 출력
             self.log("설정이 저장되었습니다:", LOG_SUCCESS)
             for value in saved_values:
                 self.log(f"- {value}", LOG_INFO)
             
             # 설정 파일 경로 출력
-            config_path = self.config_manager._config_path
+            config_path = self.config_manager.config_path
             self.log(f"설정 파일 저장 위치: {config_path}", LOG_INFO)
             
             # 터미널에 설정 정보 출력

@@ -106,7 +106,7 @@ class ConfigManager:
             with open(self.config_path, 'w', encoding='utf-8') as f:
                 json.dump(self.config, f, ensure_ascii=False, indent=2)
             
-            self.logger.info("설정 파일 저장 완료")
+            self.logger.info(f"설정 파일 저장 완료: {self.config_path}")
             return True
             
         except Exception as e:
@@ -123,9 +123,11 @@ class ConfigManager:
             if isinstance(key, (ConfigKey, SpreadsheetConfigKey)):
                 key = key.value
             self.config[key] = value
+            self.logger.info(f"설정 값이 변경되었습니다: {key}={value}")
             
         # 한 번만 저장
-        self.save()
+        if not self.save():
+            raise Exception("설정 파일 저장에 실패했습니다.")
     
     def get_all(self) -> Dict[str, Any]:
         """모든 설정 값 가져오기"""

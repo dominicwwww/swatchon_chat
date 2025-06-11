@@ -105,6 +105,13 @@ class ConfigKey(Enum):
 
 # 스프레드시트 설정 키
 class SpreadsheetConfigKey(Enum):
+    # Google API 설정
+    GOOGLE_CREDENTIALS = "google_credentials"
+    
+    # 주소록 관련
+    ADDRESS_BOOK_URL = "address_book_spreadsheet_url"
+    ADDRESS_BOOK_SHEET = "address_book_sheet_name"
+    
     # FBO (Fabric Bulk Order) 관련
     FBO_SHIPMENT_REQUEST_URL = "fbo_shipment_request_spreadsheet_url"
     FBO_SHIPMENT_REQUEST_SHEET = "fbo_shipment_request_sheet_name"

@@ -1,18 +1,18 @@
 {
-  "google_credentials": "kakaotalk-427704-676be7d19846.json",
+  "google_credentials": "D:/dev/swatchon_chat/kakaotalk-427704-92547a8b5371.json",
   "fbo_shipment_request_spreadsheet_url": "https://docs.google.com/spreadsheets/d/1xiH2opDnR570-N0nXPYpVPFNSksrwQqeEAb2YHFOp0Q/edit?usp=sharing",
   "fbo_shipment_request_sheet_name": "",
-  "fbo_shipment_confirm_spreadsheet_url": "dfsaf",
+  "fbo_shipment_confirm_spreadsheet_url": "https://docs.google.com/spreadsheets/d/1EsSjZj6ookvVsaWwBXbv23npfaU4BKoNjzTcYF-S0P8/edit?usp=sharing",
   "fbo_shipment_confirm_sheet_name": "출고확인",
-  "fbo_po_spreadsheet_url": "sadf",
+  "fbo_po_spreadsheet_url": "https://docs.google.com/spreadsheets/d/1EsSjZj6ookvVsaWwBXbv23npfaU4BKoNjzTcYF-S0P8/edit?usp=sharing",
   "fbo_po_sheet_name": "발주확인요청",
-  "fbo_receive_spreadsheet_url": "https://admin.swatchon.me/purchase_products/receive_index",
+  "fbo_receive_spreadsheet_url": "https://docs.google.com/spreadsheets/d/1EsSjZj6ookvVsaWwBXbv23npfaU4BKoNjzTcYF-S0P8/edit?usp=sharing",
   "fbo_receive_sheet_name": "입고확인",
-  "sbo_po_spreadsheet_url": "saf",
+  "sbo_po_spreadsheet_url": "https://docs.google.com/spreadsheets/d/1EsSjZj6ookvVsaWwBXbv23npfaU4BKoNjzTcYF-S0P8/edit?usp=sharing",
   "sbo_po_sheet_name": "스와치발주",
-  "sbo_pickup_request_spreadsheet_url": "saf",
+  "sbo_pickup_request_spreadsheet_url": "https://docs.google.com/spreadsheets/d/1EsSjZj6ookvVsaWwBXbv23npfaU4BKoNjzTcYF-S0P8/edit?usp=sharing",
   "sbo_pickup_request_sheet_name": "스와치픽업요청",
-  "address_book_spreadsheet_url": "https://docs.google.com/spreadsheets/d/1EsSjZj6ookvVsaWwBXbv23npfaU4BKoNjzTcYF-S0P8/edit?gid=97512522#gid=97512522",
+  "address_book_spreadsheet_url": "https://docs.google.com/spreadsheets/d/1EsSjZj6ookvVsaWwBXbv23npfaU4BKoNjzTcYF-S0P8/edit?usp=sharing",
   "address_book_sheet_name": "주소록",
   "swatchon_admin_url": "https://admin.swatchon.me",
   "swatchon_username": "dominic@swatchon.com",
@@ -43,8 +43,8 @@
         "title": "FBO 출고 요청",
         "content": "[출고 요청-{store_name}]\n안녕하세요!\n오늘 출고 예정인 주문 알려드립니다.\n\n{order_details}\n\n출고 불가 시 반드시 출고일 변경 부탁드립니다.\n[주문]>[출고예정] 링크:\nhttps://partners.swatchon.com/purchases/products/need-sent?page=1",
         "variables": [
-          "store_name",
-          "order_details"
+          "order_details",
+          "store_name"
         ],
         "conditions": [
           {
@@ -54,8 +54,8 @@
             "template": "[출고 확인 요청-{store_name}]\n안녕하세요!\n어제({pickup_at}) 출고 예정이었던 주문의 출고 여부를 확인 부탁드립니다.\n\n{order_details}\n\n출고가 완료되었으면 처리해주시고,\n출고가 불가하다면 출고일을 변경해 주세요.\n\n[주문]>[출고예정] 링크:\nhttps://partners.swatchon.com/purchases/products/need-sent?page=1"
           }
         ],
-        "order_details_format": "[{quality_name}] | #{color_number} | {quantity}yd | {pickup_at} | {delivery_method}-{logistics_company}",
-        "last_modified": "2025-06-04T09:42:39.887282"
+        "order_details_format": "[{quality_name}] | 컬러코드 #{color_code} | 컬러순서 #{color_number} | {quantity}yd | {pickup_at} | {delivery_method}-{logistics_company}",
+        "last_modified": "2025-06-11T13:13:16.010951"
       },
       "shipment_confirm": {
         "title": "FBO 출고 확인",

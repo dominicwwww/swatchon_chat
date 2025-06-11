@@ -19,6 +19,9 @@ LOG_WARNING = "warning"
 LOG_ERROR = "error"
 LOG_SUCCESS = "success"
 
+# 로그 메시지 최대 길이
+MAX_LOG_MESSAGE_LENGTH = 500
+
 class LogWidget(QWidget):
     """
     로그 메시지를 표시하는 위젯
@@ -57,7 +60,7 @@ class LogWidget(QWidget):
         # 로그 텍스트 영역
         self.log_text = QPlainTextEdit()
         self.log_text.setReadOnly(True)
-        self.log_text.setMaximumBlockCount(10000)  # 최대 로그 줄 수 제한
+        self.log_text.setMaximumBlockCount(1000)  # 최대 로그 줄 수 제한 (10000 -> 1000으로 감소)
         self.log_text.setMinimumHeight(400)  # 최소 높이 설정
         
         # 글꼴 설정
@@ -115,6 +118,10 @@ class LogWidget(QWidget):
     def add_log(self, message: str, log_type: str = LOG_INFO):
         """로그 메시지 추가"""
         try:
+            # 메시지 길이 제한
+            if len(message) > MAX_LOG_MESSAGE_LENGTH:
+                message = message[:MAX_LOG_MESSAGE_LENGTH] + "... (생략됨)"
+            
             # 텍스트 포맷 설정
             format = QTextCharFormat()
             
