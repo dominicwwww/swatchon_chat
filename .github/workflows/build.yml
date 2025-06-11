@@ -22,19 +22,6 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
       
-    - name: Download Inno Setup
-      run: |
-        $url = "https://files.jrsoftware.org/is/6/innosetup-6.2.2.exe"
-        $output = "innosetup.exe"
-        Invoke-WebRequest -Uri $url -OutFile $output
-        Start-Process -FilePath $output -ArgumentList "/VERYSILENT /SUPPRESSMSGBOXES" -Wait
-      
-    - name: Compile Installer
-      run: |
-        $version = (Get-Content version.json | ConvertFrom-Json).version
-        $env:APP_VERSION = $version
-        & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss
-      
     - name: Create Release
       uses: softprops/action-gh-release@v1
       with:
@@ -44,4 +31,4 @@ jobs:
           dist/SwatchonChat-Setup-*.exe
           dist/SwatchonChat-*.zip
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
+        GITHUB_TOKEN: ${{ secrets.GH_PAT }} 
