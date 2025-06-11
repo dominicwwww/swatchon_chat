@@ -8,4 +8,6 @@ from services.base_scraper import BaseScraper
 from services.shipment_request_scraper import ShipmentRequestScraper
 
 # 버전 정보
-__version__ = "1.0.0" 
+__version__ = "1.0.0"
+
+# services 패키지 초기화 파일 (zip 배포용) 
