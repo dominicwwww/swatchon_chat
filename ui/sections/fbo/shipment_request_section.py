@@ -492,14 +492,73 @@ class ShipmentRequestSection(BaseSection):
                 self.log("=" * 50, LOG_INFO)
                 
                 # 메시지 전송
-                self.message_manager.send_messages(
-                    update_status_callback=self._update_item_status
-                )
+                try:
+                    # 다음 판매자 정보 로깅
+                    preview_data = self.message_manager.get_preview_data()
+                    if preview_data:
+                        remaining_sellers = list(preview_data.keys())
+                        if remaining_sellers:
+                            next_seller = remaining_sellers[0]
+                            seller_info = preview_data[next_seller]
+                            self.log(f"\n다음 전송 예정 판매자: {next_seller}", LOG_INFO)
+                            self.log(f"채팅방 이름: {seller_info.get('chat_room_name', 'N/A')}", LOG_INFO)
+                            self.log(f"메시지 길이: {len(seller_info.get('message', ''))}자", LOG_INFO)
+                            self.log(f"전송할 항목 수: {len(seller_info.get('items', []))}개", LOG_INFO)
+                    
+                    # 메시지 전송 시도
+                    self.message_manager.send_messages(
+                        update_status_callback=self._update_item_status
+                    )
+                except Exception as send_error:
+                    import traceback
+                    error_msg = f"메시지 전송 중 예외 발생:\n{str(send_error)}\n{traceback.format_exc()}"
+                    print(error_msg)  # 터미널에 전체 스택트레이스 출력
+                    self.log(error_msg, LOG_ERROR)
+                    
+                    # 현재 남은 판매자 정보 로깅
+                    preview_data = self.message_manager.get_preview_data()
+                    if preview_data:
+                        remaining_sellers = list(preview_data.keys())
+                        if remaining_sellers:
+                            self.log("\n전송 실패 시점의 남은 판매자 목록:", LOG_ERROR)
+                            for seller in remaining_sellers:
+                                self.log(f"- {seller}", LOG_ERROR)
+                    
+                    # 사용자에게 상세한 오류 메시지 표시
+                    QMessageBox.critical(
+                        self, 
+                        "전송 오류", 
+                        f"메시지 전송 중 오류가 발생했습니다:\n\n"
+                        f"오류 내용: {str(send_error)}\n\n"
+                        f"자세한 내용은 로그를 확인해주세요."
+                    )
+                    self._reset_send_button_state()
+                    return
+                
             except Exception as e:
-                error_msg = f"메시지 전송 중 오류 발생: {str(e)}\n{traceback.format_exc()}"
+                import traceback
+                error_msg = f"메시지 전송 처리 중 예외 발생:\n{str(e)}\n{traceback.format_exc()}"
+                print(error_msg)  # 터미널에 전체 스택트레이스 출력
                 self.log(error_msg, LOG_ERROR)
-                QMessageBox.critical(self, "전송 오류", error_msg)
+                
+                # 현재 남은 판매자 정보 로깅
+                preview_data = self.message_manager.get_preview_data()
+                if preview_data:
+                    remaining_sellers = list(preview_data.keys())
+                    if remaining_sellers:
+                        self.log("\n처리 중 예외 발생 시점의 남은 판매자 목록:", LOG_ERROR)
+                        for seller in remaining_sellers:
+                            self.log(f"- {seller}", LOG_ERROR)
+                
+                QMessageBox.critical(
+                    self, 
+                    "전송 오류", 
+                    f"메시지 전송 처리 중 오류가 발생했습니다:\n\n"
+                    f"오류 내용: {str(e)}\n\n"
+                    f"자세한 내용은 로그를 확인해주세요."
+                )
                 self._reset_send_button_state()
+                return
     
     def _on_emergency_stop_clicked(self):
         """긴급 정지 버튼 클릭 이벤트"""

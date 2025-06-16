@@ -327,6 +327,10 @@ class MainWindow(QMainWindow):
         else:
             print(f"[LOG][{log_type}] {message}")
 
+    def show_critical_error(self, message: str):
+        """치명적 오류 알림창 표시"""
+        QMessageBox.critical(self, "치명적 오류", message)
+
 def create_app():
     """애플리케이션 및 메인 윈도우 생성"""
     app = QApplication(sys.argv)

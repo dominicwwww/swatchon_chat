@@ -7,17 +7,31 @@ import os
 import signal
 import psutil
 import traceback
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QMessageBox
 from PySide6.QtCore import QTimer
 
 def global_excepthook(exctype, value, tb):
-    """전역 예외 핸들러"""
-    print("\n=== 전역 예외 발생 ===")
-    print("타입:", exctype)
-    print("값:", value)
+    """전역 예외 핸들러 (로그 파일 기록 및 사용자 알림 추가)"""
+    import datetime
+    now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    msg = f"\n=== 전역 예외 발생 ===\n시간: {now}\n타입: {exctype}\n값: {value}\n"
+    print(msg)
     traceback.print_exception(exctype, value, tb)
     print("===================\n")
-    
+    # 로그 파일에도 기록
+    try:
+        with open("crash.log", "a", encoding="utf-8") as f:
+            f.write(msg)
+            traceback.print_exception(exctype, value, tb, file=f)
+            f.write("\n===================\n")
+    except Exception as log_exc:
+        print(f"crash.log 기록 실패: {log_exc}")
+    # 사용자에게 알림
+    if QApplication.instance():
+        try:
+            QMessageBox.critical(None, "치명적 오류", "프로그램에 치명적 오류가 발생했습니다.\ncrash.log 파일을 확인해 주세요.")
+        except Exception as msg_exc:
+            print(f"QMessageBox 표시 실패: {msg_exc}")
     # 예외 발생 시에도 앱이 종료되지 않도록
     if QApplication.instance():
         QApplication.instance().processEvents()

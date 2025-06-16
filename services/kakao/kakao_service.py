@@ -5,12 +5,16 @@
 import platform
 import time
 import re
-from typing import Optional
+from typing import Optional, Callable
 
 import win32gui
 import win32con
 import win32clipboard
 from win32com.client import Dispatch
+from selenium.webdriver.common.keys import Keys
+import sys
+import multiprocessing
+import faulthandler
 
 from core.logger import get_logger
 from core.exceptions import KakaoException
@@ -25,53 +29,51 @@ class KakaoService:
         self.logger = get_logger(__name__)
         self.shell = Dispatch("WScript.Shell") if platform.system() == "Windows" else None
     
-    def send_message(self, message: str, log_function: Optional[LogFunction] = None) -> bool:
-        """
-        메시지 전송 (로그 함수를 통한 실시간 표시)
-        
-        Args:
-            message: 전송할 메시지
-            log_function: 로그 출력 함수 (None인 경우 logger.info 사용)
+    def send_message(self, chat_room_name: str, message: str) -> bool:
+        """카카오톡 메시지 전송"""
+        try:
+            # 전송 시작 로깅
+            self.logger.info(f"\n=== 카카오톡 메시지 전송 시작 ===")
+            self.logger.info(f"채팅방: {chat_room_name}")
+            self.logger.info(f"메시지 길이: {len(message)}")
             
-        Returns:
-            bool: 전송 성공 여부
-        """
-        if log_function is None:
-            log_function = self.logger.info
-
-        # HTML 태그 처리
-        message = self._clean_html_tags(message)
-
-        # 메시지 본문에서 채팅방 이름 추출
-        chatroom_name = self._extract_chatroom_name(message)
-        
-        # 윈도우에서 실제 메시지 전송
-        if platform.system() == "Windows":
-            # 채팅방 검색 및 열기
-            if not self.open_chatroom(chatroom_name):
-                log_function(f"채팅방 '{chatroom_name}' 을(를) 찾을 수 없습니다.")
+            # 채팅방 열기
+            self.logger.info("채팅방 열기 시도...")
+            if not self.open_chatroom(chat_room_name):
+                self.logger.error("채팅방을 열 수 없습니다.")
                 return False
-
+            
             # 메시지 전송
-            result = self._send_text_windows(chatroom_name, message)
+            self.logger.info("메시지 전송 시도...")
+            if not self._send_text_windows(message):
+                self.logger.error("메시지 전송에 실패했습니다.")
+                return False
             
             # 채팅방 닫기
-            self.close_chatroom(chatroom_name)
+            self.logger.info("채팅방 닫기 시도...")
+            try:
+                self.close_chatroom()
+            except Exception as e:
+                self.logger.error(f"채팅방 닫기 실패: {str(e)}")
+                # 채팅방 닫기 실패는 전체 실패로 처리하지 않음
+                pass
             
-            if result:
-                log_function(f"메시지가 '{chatroom_name}' 에게 성공적으로 전송되었습니다.")
-            else:
-                log_function(f"메시지 전송 실패: '{chatroom_name}'")
+            self.logger.info("=== 메시지 전송 완료 ===\n")
+            return True
             
-            return result
-        else:
-            # macOS 등 Windows가 아닌 환경
-            log_function(f"[개발 모드] '{chatroom_name}'에게 메시지를 전송합니다:")
-            log_function(f"--- 메시지 내용 시작 ---")
-            log_function(message)
-            log_function(f"--- 메시지 내용 끝 ---")
-            log_function(f"메시지 길이: {len(message)}자")
-            return True  # 개발 모드에서는 성공으로 처리
+        except Exception as e:
+            # 전체 프로세스 중 발생한 예외 로깅
+            error_msg = f"카카오톡 메시지 전송 중 오류 발생: {str(e)}"
+            self.logger.error(error_msg)
+            self.logger.error(f"스택 트레이스:\n{traceback.format_exc()}")
+            
+            # 채팅방이 열려있는 경우 닫기 시도
+            try:
+                self.close_chatroom()
+            except:
+                pass
+            
+            return False
     
     def open_chatroom(self, chatroom_name: str) -> bool:
         """
@@ -89,7 +91,13 @@ class KakaoService:
         
         try:
             # 카카오톡 메인 창 찾기
-            hwndkakao = win32gui.FindWindow(None, "카카오톡")
+            try:
+                hwndkakao = win32gui.FindWindow(None, "카카오톡")
+            except Exception as e:
+                self.logger.error(f"카카오톡 창 핸들 검색 중 치명적 오류: {str(e)}")
+                with open("crash.log", "a", encoding="utf-8") as f:
+                    f.write(f"[open_chatroom] 카카오톡 창 핸들 검색 중 치명적 오류: {str(e)}\n")
+                return False
             if not hwndkakao:
                 # "카카오톡" 대신 "KakaoTalk"로도 시도
                 hwndkakao = win32gui.FindWindow(None, "KakaoTalk")
@@ -191,26 +199,26 @@ class KakaoService:
             return False
     
     def _send_text_windows(self, chatroom_name: str, text: str) -> bool:
-        """
-        Windows 환경에서 텍스트 전송 (레퍼런스 코드 방식)
-        
-        Args:
-            chatroom_name: 채팅방 이름
-            text: 전송할 텍스트
-            
-        Returns:
-            bool: 성공 여부
-        """
         try:
             # HTML 태그가 있으면 일반 텍스트로 변환
-            text = self._clean_html_tags(text)
+            try:
+                text = self._clean_html_tags(text)
+            except Exception as e:
+                self.logger.error(f"HTML 태그 제거 실패: {str(e)}")
+                return False
 
             # 채팅방 창 찾기
-            hwndMain = win32gui.FindWindow(None, chatroom_name)
+            try:
+                hwndMain = win32gui.FindWindow(None, chatroom_name)
+            except Exception as e:
+                self.logger.error(f"채팅방 핸들 검색 중 치명적 오류: {str(e)}")
+                with open("crash.log", "a", encoding="utf-8") as f:
+                    f.write(f"[_send_text_windows] 채팅방 핸들 검색 중 치명적 오류: {str(e)}\n")
+                return False
             if hwndMain == 0:
                 self.logger.error(f"채팅방 '{chatroom_name}' 창을 찾을 수 없습니다.")
                 return False
-            
+
             # 채팅방 윈도우를 활성화 (오류 무시 처리)
             try:
                 win32gui.SetForegroundWindow(hwndMain)
@@ -228,22 +236,38 @@ class KakaoService:
                 win32clipboard.CloseClipboard()
             except Exception as e:
                 self.logger.error(f"클립보드 복사 실패: {str(e)}")
+                with open("crash.log", "a", encoding="utf-8") as f:
+                    f.write(f"[_send_text_windows] 클립보드 복사 실패: {str(e)}\n")
                 return False
-            
+
             time.sleep(0.2)  # 대기 시간 조정
 
             # Ctrl+V로 붙여넣기
-            self.shell.SendKeys("^v")
+            try:
+                self.shell.SendKeys("^v")
+            except Exception as e:
+                self.logger.error(f"SendKeys(^v) 실패: {str(e)}")
+                with open("crash.log", "a", encoding="utf-8") as f:
+                    f.write(f"[_send_text_windows] SendKeys(^v) 실패: {str(e)}\n")
+                return False
             time.sleep(0.2)  # 대기 시간 조정
 
             # Enter 키로 전송
-            self.shell.SendKeys("{ENTER}")
+            try:
+                self.shell.SendKeys("{ENTER}")
+            except Exception as e:
+                self.logger.error(f"SendKeys(ENTER) 실패: {str(e)}")
+                with open("crash.log", "a", encoding="utf-8") as f:
+                    f.write(f"[_send_text_windows] SendKeys(ENTER) 실패: {str(e)}\n")
+                return False
             time.sleep(0.2)  # 대기 시간 조정
 
             return True
-            
+
         except Exception as e:
             self.logger.error(f"텍스트 전송 실패: {str(e)}")
+            with open("crash.log", "a", encoding="utf-8") as f:
+                f.write(f"[_send_text_windows] 텍스트 전송 실패: {str(e)}\n")
             return False
     
     def _clean_html_tags(self, text: str) -> str:
@@ -289,48 +313,103 @@ class KakaoService:
         
         return "Unknown"
     
-    def send_message_to_seller(self, seller_name: str, message: str, log_function: Optional[LogFunction] = None) -> bool:
+    def send_message_to_seller(self, chat_room_name: str, message: str, log_function: Optional[Callable] = None) -> bool:
         """
-        판매자에게 메시지 전송 (판매자명 직접 지정)
+        판매자에게 메시지 전송
         
         Args:
-            seller_name: 판매자명
+            chat_room_name: 채팅방 이름
             message: 전송할 메시지
-            log_function: 로그 출력 함수 (None인 경우 logger.info 사용)
+            log_function: 로그 출력 함수
             
         Returns:
             bool: 전송 성공 여부
         """
-        if log_function is None:
-            log_function = self.logger.info
-
-        # HTML 태그 처리
-        message = self._clean_html_tags(message)
-        
-        # 윈도우에서 실제 메시지 전송
-        if platform.system() == "Windows":
-            # 채팅방 검색 및 열기
-            if not self.open_chatroom(seller_name):
-                log_function(f"채팅방 '{seller_name}' 을(를) 찾을 수 없습니다.")
-                return False
-
-            # 메시지 전송
-            result = self._send_text_windows(seller_name, message)
+        try:
+            # HTML 태그 처리
+            message = self._clean_html_tags(message)
             
-            # 채팅방 닫기
-            self.close_chatroom(seller_name)
-            
-            if result:
-                log_function(f"메시지가 '{seller_name}' 에게 성공적으로 전송되었습니다.")
+            # 윈도우에서 실제 메시지 전송
+            if platform.system() == "Windows":
+                try:
+                    # 채팅방 검색 및 열기
+                    if not self.open_chatroom(chat_room_name):
+                        error_msg = f"채팅방 '{chat_room_name}' 을(를) 찾을 수 없습니다."
+                        print(error_msg)  # 터미널에 출력
+                        if log_function:
+                            log_function(error_msg, "error")
+                        return False
+
+                    # 메시지 전송
+                    result = self._send_text_windows(chat_room_name, message)
+                    
+                    # 채팅방 닫기
+                    try:
+                        self.close_chatroom(chat_room_name)
+                    except Exception as close_error:
+                        import traceback
+                        error_msg = f"채팅방 닫기 실패:\n{str(close_error)}\n{traceback.format_exc()}"
+                        print(error_msg)  # 터미널에 출력
+                        if log_function:
+                            log_function(error_msg, "error")
+                        # 채팅방 닫기 실패는 전체 실패로 처리하지 않음
+                    
+                    if result:
+                        if log_function:
+                            log_function(f"메시지가 '{chat_room_name}' 에게 성공적으로 전송되었습니다.", "success")
+                    else:
+                        error_msg = f"메시지 전송 실패: '{chat_room_name}'"
+                        print(error_msg)  # 터미널에 출력
+                        if log_function:
+                            log_function(error_msg, "error")
+                    
+                    return result
+                except Exception as e:
+                    import traceback
+                    error_msg = f"메시지 전송 중 오류 발생:\n{str(e)}\n{traceback.format_exc()}"
+                    print(error_msg)  # 터미널에 출력
+                    if log_function:
+                        log_function(error_msg, "error")
+                    return False
             else:
-                log_function(f"메시지 전송 실패: '{seller_name}'")
-            
-            return result
-        else:
-            # macOS 등 Windows가 아닌 환경
-            log_function(f"[개발 모드] '{seller_name}'에게 메시지를 전송합니다:")
-            log_function(f"--- 메시지 내용 시작 ---")
-            log_function(message)
-            log_function(f"--- 메시지 내용 끝 ---")
-            log_function(f"메시지 길이: {len(message)}자")
-            return True  # 개발 모드에서는 성공으로 처리 
+                # macOS 등 Windows가 아닌 환경
+                if log_function:
+                    log_function(f"[개발 모드] '{chat_room_name}'에게 메시지를 전송합니다:", "info")
+                    log_function(f"--- 메시지 내용 시작 ---", "info")
+                    log_function(message, "info")
+                    log_function(f"--- 메시지 내용 끝 ---", "info")
+                    log_function(f"메시지 길이: {len(message)}자", "info")
+                return True  # 개발 모드에서는 성공으로 처리
+                
+        except Exception as e:
+            import traceback
+            error_msg = f"카카오톡 메시지 전송 중 치명적 오류:\n{str(e)}\n{traceback.format_exc()}"
+            print(error_msg)  # 터미널에 출력
+            if log_function:
+                log_function(error_msg, "error")
+            return False 
+
+def send_message_in_subprocess(chat_room_name, message, timeout=15):
+    ctx = multiprocessing.get_context('spawn')
+    result_queue = ctx.Queue()
+
+    def target(q, chat_room_name, message):
+        faulthandler.enable(open("subprocess_crash.log", "a"))
+        from services.kakao.kakao_service import KakaoService
+        service = KakaoService()
+        try:
+            res = service.send_message(chat_room_name, message)
+            q.put(res)
+        except Exception as e:
+            q.put(False)
+
+    p = ctx.Process(target=target, args=(result_queue, chat_room_name, message))
+    p.start()
+    p.join(timeout)
+    if p.is_alive():
+        p.terminate()
+        return False  # timeout/crash
+    try:
+        return result_queue.get_nowait()
+    except Exception:
+        return False 

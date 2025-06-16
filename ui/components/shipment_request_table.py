@@ -183,35 +183,17 @@ class ShipmentRequestTable(QTableWidget):
                     label.setAlignment(Qt.AlignCenter)
                     if self.load_photo:
                         image_url = getattr(item, 'image_url', None) or getattr(item, 'print_url', None)
-                        print(f"[썸네일] 이미지 URL: {image_url}")
-                        if self.log_function:
-                            self.log_function(f"[썸네일] 이미지 URL: {image_url}", LOG_DEBUG)
                         if image_url:
                             try:
                                 headers = {"User-Agent": "Mozilla/5.0"}
                                 response = requests.get(image_url, headers=headers, timeout=3)
-                                print(f"[썸네일] status_code: {response.status_code}")
-                                if self.log_function:
-                                    self.log_function(f"[썸네일] status_code: {response.status_code}", LOG_DEBUG)
                                 if response.status_code == 200:
                                     image = QImage.fromData(response.content)
-                                    print(f"[썸네일] QImage isNull: {image.isNull()}")
-                                    if self.log_function:
-                                        self.log_function(f"[썸네일] QImage isNull: {image.isNull()}", LOG_DEBUG)
                                     if not image.isNull():
                                         pixmap = QPixmap.fromImage(image).scaled(48, 48, Qt.KeepAspectRatio, Qt.SmoothTransformation)
                                         label.setPixmap(pixmap)
-                                else:
-                                    print(f"[썸네일] 이미지 응답 status_code 오류: {response.status_code}")
-                                    if self.log_function:
-                                        self.log_function(f"[썸네일] 이미지 응답 status_code 오류: {response.status_code}", LOG_WARNING)
-                            except Exception as e:
-                                print(f"[썸네일] 이미지 로드 예외: {e}")
-                                if self.log_function:
-                                    self.log_function(f"[썸네일] 이미지 로드 예외: {e}", LOG_ERROR)
-                    else:
-                        if self.log_function:
-                            self.log_function("사진 로드가 비활성화되어 썸네일을 표시하지 않습니다.", LOG_INFO)
+                            except Exception:
+                                pass
                     self.setCellWidget(row_idx, 1, label)
                     
                     # 2. ID

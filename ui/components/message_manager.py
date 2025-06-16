@@ -5,6 +5,8 @@ from typing import List, Dict, Any, Optional, Callable
 from datetime import datetime
 from PySide6.QtWidgets import QMessageBox
 from PySide6.QtCore import QObject, Signal, QThread
+import time
+import traceback
 
 from core.types import OrderType, FboOperationType, SboOperationType, ShipmentStatus, MessageStatus
 from services.template.template_service import TemplateService
@@ -29,7 +31,6 @@ class MessageSenderThread(QThread):
             result = self.message_manager._send_messages_internal(self.update_status_callback)
             self.finished.emit(result)
         except Exception as e:
-            import traceback
             print("\n=== QThread에서 예외 발생 ===")
             print("타입:", type(e))
             print("값:", e)
@@ -395,38 +396,83 @@ class MessageManager(QObject):
         try:
             self.log(f"=== 메시지 전송 시작 ({len(self._message_preview_data)}명의 판매자) ===", LOG_INFO)
             
+            # 전체 판매자 목록 로그
+            self.log("\n전체 전송 예정 판매자 목록:", LOG_INFO)
+            for idx, seller in enumerate(self._message_preview_data.keys(), 1):
+                self.log(f"{idx}. {seller}", LOG_INFO)
+            self.log("", LOG_INFO)  # 빈 줄 추가
+            
             success_count = 0
             fail_count = 0
             sent_item_ids = []  # 전송 성공한 항목들의 ID 저장
             cancelled_item_ids = []
             
-            for seller_name, data in self._message_preview_data.items():
+            # 판매자 목록을 리스트로 변환
+            sellers = list(self._message_preview_data.keys())
+            
+            for idx, seller_name in enumerate(sellers):
+                data = self._message_preview_data[seller_name]
+                
                 # 긴급 정지 확인
                 if self._emergency_stop:
                     self.log("⚠️ 긴급 정지가 요청되었습니다. 전송을 중단합니다.", LOG_WARNING)
                     # 남은 항목들을 취소 상태로 설정
                     for remaining_seller, remaining_data in self._message_preview_data.items():
-                        if remaining_seller not in [s for s, _ in list(self._message_preview_data.items())[:list(self._message_preview_data.keys()).index(seller_name)]]:
+                        if remaining_seller not in sellers[:idx]:
                             for item in remaining_data['items']:
                                 item_id = item.get('id')
                                 if item_id:
                                     cancelled_item_ids.append(item_id)
                     break
+
                 try:
-                    chat_room_name = data['chat_room_name']
-                    message = data['message']
-                    seller_items = data['items']
+                    chat_room_name = data.get('chat_room_name')
+                    message = data.get('message')
+                    seller_items = data.get('items', [])
+
+                    # === 현재 판매자 정보 로그 ===
+                    self.log(f"\n[전송 예정] 판매자: {seller_name}", LOG_INFO)
+                    self.log(f"채팅방 이름: {chat_room_name if chat_room_name else 'N/A'}", LOG_INFO)
+                    self.log(f"메시지 길이: {len(message) if message else 0}자", LOG_INFO)
+                    self.log(f"전송할 항목 수: {len(seller_items)}개", LOG_INFO)
+                    
+                    # === 다음 판매자 정보 미리 로그 ===
+                    if idx + 1 < len(sellers):
+                        next_seller = sellers[idx + 1]
+                        next_data = self._message_preview_data[next_seller]
+                        self.log(f"\n다음 전송 예정 판매자: {next_seller}", LOG_INFO)
+                        self.log(f"채팅방 이름: {next_data.get('chat_room_name', 'N/A')}", LOG_INFO)
+                        self.log(f"메시지 길이: {len(next_data.get('message', ''))}자", LOG_INFO)
+                        self.log(f"전송할 항목 수: {len(next_data.get('items', []))}개", LOG_INFO)
+                    # === END ===
+
+                    if not chat_room_name:
+                        raise ValueError(f"채팅방 이름이 없습니다: {seller_name}")
+                    if not message:
+                        raise ValueError(f"메시지 내용이 없습니다: {seller_name}")
+                    if not seller_items:
+                        raise ValueError(f"전송할 항목이 없습니다: {seller_name}")
+
                     # 해당 판매자의 항목들을 "전송중" 상태로 업데이트
                     seller_item_ids = [item.get('id') for item in seller_items if item.get('id')]
                     if update_status_callback:
-                        update_status_callback(seller_item_ids, MessageStatus.SENDING.value)
+                        try:
+                            update_status_callback(seller_item_ids, MessageStatus.SENDING.value)
+                        except Exception as callback_error:
+                            print(f"상태 업데이트 콜백 오류: {str(callback_error)}")
+                            self.log(f"상태 업데이트 콜백 오류: {str(callback_error)}", LOG_ERROR)
+
                     self.log(f"[{seller_name}] → [{chat_room_name}] 메시지 전송 중...", LOG_INFO)
+                    
                     try:
                         # 카카오톡으로 실제 메시지 전송
                         success = self.kakao_service.send_message_to_seller(chat_room_name, message, log_function=self.log)
                     except Exception as send_exc:
-                        self.log(f"카카오톡 메시지 전송 중 예외 발생: {send_exc}", LOG_ERROR)
+                        error_msg = f"카카오톡 메시지 전송 중 예외 발생:\n{str(send_exc)}\n{traceback.format_exc()}"
+                        print(error_msg)  # 터미널에 전체 스택트레이스 출력
+                        self.log(error_msg, LOG_ERROR)
                         success = False
+
                     if success:
                         self.log(f"✅ {seller_name}({chat_room_name})에게 메시지 전송 성공", LOG_SUCCESS)
                         success_count += 1
@@ -435,30 +481,52 @@ class MessageManager(QObject):
                             if item_id:
                                 sent_item_ids.append(item_id)
                         if update_status_callback:
-                            update_status_callback(seller_item_ids, MessageStatus.SENT.value, True)
+                            try:
+                                update_status_callback(seller_item_ids, MessageStatus.SENT.value, True)
+                            except Exception as callback_error:
+                                print(f"상태 업데이트 콜백 오류: {str(callback_error)}")
+                                self.log(f"상태 업데이트 콜백 오류: {str(callback_error)}", LOG_ERROR)
                     else:
                         self.log(f"❌ {seller_name}({chat_room_name}) 메시지 전송 실패", LOG_ERROR)
                         fail_count += 1
                         failed_item_ids = [item.get('id') for item in seller_items if item.get('id')]
                         if update_status_callback:
-                            update_status_callback(failed_item_ids, MessageStatus.FAILED.value)
+                            try:
+                                update_status_callback(failed_item_ids, MessageStatus.FAILED.value)
+                            except Exception as callback_error:
+                                print(f"상태 업데이트 콜백 오류: {str(callback_error)}")
+                                self.log(f"상태 업데이트 콜백 오류: {str(callback_error)}", LOG_ERROR)
+
                 except Exception as e:
-                    self.log(f"❌ {seller_name} 메시지 전송 실패(예외): {str(e)}", LOG_ERROR)
+                    error_msg = f"❌ {seller_name} 메시지 전송 실패(예외):\n{str(e)}\n{traceback.format_exc()}"
+                    print(error_msg)  # 터미널에 전체 스택트레이스 출력
+                    self.log(error_msg, LOG_ERROR)
                     fail_count += 1
                     if 'seller_items' in locals():
                         failed_item_ids = [item.get('id') for item in seller_items if item.get('id')]
                         if update_status_callback:
-                            update_status_callback(failed_item_ids, MessageStatus.FAILED.value)
+                            try:
+                                update_status_callback(failed_item_ids, MessageStatus.FAILED.value)
+                            except Exception as callback_error:
+                                print(f"상태 업데이트 콜백 오류: {str(callback_error)}")
+                                self.log(f"상태 업데이트 콜백 오류: {str(callback_error)}", LOG_ERROR)
                     continue  # 예외 발생 시에도 다음 판매자 계속 진행
+
             # 취소된 항목들의 상태를 "취소됨"으로 업데이트
             if cancelled_item_ids and update_status_callback:
-                update_status_callback(cancelled_item_ids, MessageStatus.CANCELLED.value)
+                try:
+                    update_status_callback(cancelled_item_ids, MessageStatus.CANCELLED.value)
+                except Exception as callback_error:
+                    print(f"상태 업데이트 콜백 오류: {str(callback_error)}")
+                    self.log(f"상태 업데이트 콜백 오류: {str(callback_error)}", LOG_ERROR)
+
             # 전송 결과 요약
             self.log(f"=== 전송 완료 ===", LOG_INFO)
             if self._emergency_stop:
                 self.log(f"성공: {success_count}건, 실패: {fail_count}건, 취소: {len(cancelled_item_ids)}건", LOG_INFO)
             else:
                 self.log(f"성공: {success_count}건, 실패: {fail_count}건", LOG_INFO)
+
             return {
                 'success': True,
                 'success_count': success_count,
@@ -467,8 +535,11 @@ class MessageManager(QObject):
                 'sent_item_ids': sent_item_ids,
                 'emergency_stop': self._emergency_stop
             }
+
         except Exception as e:
-            self.log(f"메시지 전송 중 치명적 오류: {str(e)}", LOG_ERROR)
+            error_msg = f"메시지 전송 중 치명적 오류:\n{str(e)}\n{traceback.format_exc()}"
+            print(error_msg)  # 터미널에 전체 스택트레이스 출력
+            self.log(error_msg, LOG_ERROR)
             # 예외 발생 시에도 실패로 결과 반환
             return {'success': False, 'error': str(e)}
     
