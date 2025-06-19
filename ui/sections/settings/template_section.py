@@ -757,7 +757,7 @@ class TemplateSection(BaseSection):
             self.log("제목과 내용을 모두 입력해주세요.", LOG_WARNING)
             return
         
-        # 조건 데이터 수집
+        # 조건 데이터 수집 (새로운 다중 필드 형식 지원)
         conditions = []
         for row in range(self.conditions_table.rowCount()):
             field_item = self.conditions_table.item(row, 0)
@@ -766,12 +766,51 @@ class TemplateSection(BaseSection):
             template_item = self.conditions_table.item(row, 3)
             
             if field_item and operator_item and value_item:
-                condition = {
-                    "field": field_item.text(),
-                    "operator": operator_item.text(),
-                    "value": value_item.text(),
-                    "template": template_item.text() if template_item else ""
-                }
+                field_text = field_item.text().strip()
+                operator_text = operator_item.text().strip()
+                value_text = value_item.text().strip()
+                template_text = template_item.text() if template_item else ""
+                
+                # 필드가 여러 개인지 확인 (쉼표로 구분된 경우)
+                if ',' in field_text:
+                    # 다중 필드 형식
+                    fields = [f.strip() for f in field_text.split(',') if f.strip()]
+                    
+                    # 값이 "field: value" 형식인지 확인
+                    if ':' in value_text:
+                        # "field1: value1, field2: value2" 형식 파싱
+                        field_values = {}
+                        for pair in value_text.split(','):
+                            if ':' in pair:
+                                k, v = pair.split(':', 1)
+                                field_values[k.strip()] = v.strip()
+                            else:
+                                # 모든 필드에 같은 값 적용
+                                for field in fields:
+                                    field_values[field] = pair.strip()
+                    else:
+                        # 모든 필드에 같은 값 적용
+                        field_values = {field: value_text for field in fields}
+                    
+                    condition = {
+                        "fields": fields,
+                        "operator": operator_text,
+                        "value": field_values,
+                        "template": template_text
+                    }
+                else:
+                    # 단일 필드 형식 (기존 방식과 호환)
+                    if field_text:
+                        condition = {
+                            "field": field_text,
+                            "operator": operator_text,
+                            "value": value_text,
+                            "template": template_text
+                        }
+                    else:
+                        # 필드가 비어있으면 건너뛰기
+                        continue
+                
                 conditions.append(condition)
         
         try:

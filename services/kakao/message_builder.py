@@ -57,12 +57,17 @@ class MessageBuilder:
             if template and template.get("conditions"):
                 for condition in template.get("conditions", []):
                     if self.template_service.evaluate_condition(message_data, condition):
-                        # 조건이 만족되면 해당 템플릿 사용
                         message = condition.get("template", "")
                         if message:
-                            # 템플릿 변수 치환
-                            for k, v in message_data.items():
-                                message = message.replace(f"{{{k}}}", str(v))
+                            import re
+                            pattern = r'\{([a-zA-Z0-9_]+)\}'
+                            matches = re.findall(pattern, message)
+                            for var in matches:
+                                try:
+                                    value = message_data.get(var, "")
+                                    message = message.replace(f"{{{var}}}", str(value) if value is not None else "")
+                                except Exception as e:
+                                    message = message.replace(f"{{{var}}}", "")
                             return message
             
             # 조건부 템플릿이 없거나 조건이 만족되지 않으면 기본 메시지 생성

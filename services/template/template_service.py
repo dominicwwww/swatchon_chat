@@ -188,9 +188,10 @@ class TemplateService:
         return list(set(matches))
     
     def render_message(self, order_type: OrderType, operation_type: Union[FboOperationType, SboOperationType], data: Dict[str, Any]) -> str:
-        """메시지 렌더링"""
+        """
+        메시지 렌더링 (템플릿 변수 치환 시 예외 방어)
+        """
         try:
-            # 템플릿 로드
             template = self.load_template(order_type, operation_type)
             if not template:
                 return None
@@ -199,7 +200,6 @@ class TemplateService:
             # 조건부 템플릿 적용
             if "conditions" in template:
                 for condition in template["conditions"]:
-                    # fields가 있으면 다중 필드 조건으로 처리
                     if "fields" in condition:
                         fields = condition["fields"]
                         operator = condition["operator"]
@@ -208,7 +208,6 @@ class TemplateService:
                         if self._evaluate_multi_field_condition(data, fields, operator, value):
                             content = condition_content
                             break
-                    # 이전 버전 호환성을 위해 field도 처리
                     elif "field" in condition:
                         field = condition["field"]
                         operator = condition["operator"]
@@ -218,14 +217,18 @@ class TemplateService:
                             content = condition_content
                             break
             
-            # 모든 변수를 문자열로 변환하여 치환
-            for key, value in data.items():
-                placeholder = f"{{{key}}}"
-                if placeholder in content:
-                    content = content.replace(placeholder, str(value))
-            
+            # 변수 치환 (예외 방어)
+            import re
+            pattern = r'\{([a-zA-Z0-9_]+)\}'
+            matches = re.findall(pattern, content)
+            for var in matches:
+                try:
+                    value = data.get(var, "")
+                    content = content.replace(f"{{{var}}}", str(value) if value is not None else "")
+                except Exception as e:
+                    self.logger.warning(f"템플릿 변수 치환 중 오류: {{{var}}} → '' (에러: {str(e)})")
+                    content = content.replace(f"{{{var}}}", "")
             return content
-            
         except Exception as e:
             self.logger.error(f"메시지 렌더링 중 오류: {str(e)}")
             return None
@@ -388,7 +391,7 @@ class TemplateService:
                         field_value = field_value.split("T")[0]
                 field_values.append((field, field_value))
 
-            # {today} 지원
+            # {today} 지원 - 단일 값인 경우
             if isinstance(value, str) and value.strip() == "{today}":
                 value = datetime.now().strftime('%Y-%m-%d')
 
@@ -399,6 +402,10 @@ class TemplateService:
                     if field not in value:
                         continue
                     target_value = value[field]
+                    
+                    # {today} 지원 - 딕셔너리 값에서도 처리
+                    if isinstance(target_value, str) and target_value.strip() == "{today}":
+                        target_value = datetime.now().strftime('%Y-%m-%d')
                     
                     # 숫자 비교 연산자일 때 int/float 변환 시도
                     if operator in [">", ">=", "<", "<=", "==", "!="]:
@@ -441,25 +448,38 @@ class TemplateService:
                 # 숫자 비교 연산자일 때 int/float 변환 시도
                 if operator in [">", ">=", "<", "<=", "==", "!="]:
                     try:
-                        field_values = [float(v) for _, v in field_values]
+                        field_values_nums = [float(v) for _, v in field_values]
                         vv = float(value)
+                        # 연산자에 따른 조건 확인
+                        if operator == "==":
+                            return all(fv == vv for fv in field_values_nums)
+                        elif operator == "!=":
+                            return all(fv != vv for fv in field_values_nums)
+                        elif operator == ">":
+                            return all(fv > vv for fv in field_values_nums)
+                        elif operator == ">=":
+                            return all(fv >= vv for fv in field_values_nums)
+                        elif operator == "<":
+                            return all(fv < vv for fv in field_values_nums)
+                        elif operator == "<=":
+                            return all(fv <= vv for fv in field_values_nums)
                     except (ValueError, TypeError):
-                        field_values = [v for _, v in field_values]
-                        vv = value
+                        # 숫자 변환 실패 시 문자열로 비교
+                        pass
 
-                # 연산자에 따른 조건 확인
+                # 문자열 비교
                 if operator == "==":
-                    return all(fv == vv for _, fv in field_values)
+                    return all(fv == value for _, fv in field_values)
                 elif operator == "!=":
-                    return all(fv != vv for _, fv in field_values)
+                    return all(fv != value for _, fv in field_values)
                 elif operator == ">":
-                    return all(fv > vv for _, fv in field_values)
+                    return all(fv > value for _, fv in field_values)
                 elif operator == ">=":
-                    return all(fv >= vv for _, fv in field_values)
+                    return all(fv >= value for _, fv in field_values)
                 elif operator == "<":
-                    return all(fv < vv for _, fv in field_values)
+                    return all(fv < value for _, fv in field_values)
                 elif operator == "<=":
-                    return all(fv <= vv for _, fv in field_values)
+                    return all(fv <= value for _, fv in field_values)
                 elif operator == "in":
                     return all(value in fv for _, fv in field_values)
                 elif operator == "not in":

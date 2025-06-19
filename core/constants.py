@@ -119,7 +119,6 @@ class SpreadsheetConfigKey(Enum):
     FBO_SHIPMENT_CONFIRM_URL = "fbo_shipment_confirm_spreadsheet_url"
     FBO_SHIPMENT_CONFIRM_SHEET = "fbo_shipment_confirm_sheet_name"
     
-    FBO_PO_URL = "fbo_po_spreadsheet_url"
     FBO_PO_SHEET = "fbo_po_sheet_name"
     
     # 입고 관련
@@ -147,7 +146,7 @@ SECTION_SPREADSHEET_MAPPING = {
     },
     "fbo_po": {
         "name": "FBO 발주 확인",
-        "url_key": SpreadsheetConfigKey.FBO_PO_URL.value,
+        "url_key": SpreadsheetConfigKey.FBO_PO_SHEET.value,
         "sheet_key": SpreadsheetConfigKey.FBO_PO_SHEET.value
     },
     "fbo_receive": {

@@ -213,9 +213,7 @@ class Sidebar(QWidget):
         
         # FBO 출고 요청
         fbo_shipment_req_btn = SidebarButton("출고 요청", icon_name="ph.truck")
-        fbo_shipment_req_btn.clicked.connect(
-            lambda: self._on_button_clicked(SectionType.FBO_SHIPMENT_REQUEST.value)
-        )
+        fbo_shipment_req_btn.clicked.connect(lambda: self._on_button_clicked(SectionType.FBO_SHIPMENT_REQUEST.value))
         self.scroll_layout.addWidget(fbo_shipment_req_btn)
         self._buttons[SectionType.FBO_SHIPMENT_REQUEST.value] = fbo_shipment_req_btn
         

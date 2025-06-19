@@ -1,0 +1,333 @@
+
+=== 전역 예외 발생 ===
+시간: 2025-06-17 11:45:04
+타입: <class 'KeyError'>
+값: 'id'
+Traceback (most recent call last):
+  File "D:\dev\swatchon_chat\ui\sections\fbo\shipment_request_section.py", line 319, in _on_table_selection_changed
+    selected_ids = [item['id'] for item in selected_items]
+                    ~~~~^^^^^^
+KeyError: 'id'
+
+===================
+
+=== 전역 예외 발생 ===
+시간: 2025-06-17 11:45:17
+타입: <class 'KeyError'>
+값: 'id'
+Traceback (most recent call last):
+  File "D:\dev\swatchon_chat\ui\sections\fbo\shipment_request_section.py", line 319, in _on_table_selection_changed
+    selected_ids = [item['id'] for item in selected_items]
+                    ~~~~^^^^^^
+KeyError: 'id'
+
+===================
+
+=== 전역 예외 발생 ===
+시간: 2025-06-17 13:54:29
+타입: <class 'ImportError'>
+값: cannot import name 'FBO_PO_URL' from 'core.constants' (D:\dev\swatchon_chat\core\constants.py)
+Traceback (most recent call last):
+  File "D:\dev\swatchon_chat\main.py", line 42, in <module>
+    from ui.main_window import MainWindow
+  File "D:\dev\swatchon_chat\ui\__init__.py", line 4, in <module>
+    from ui.main_window import MainWindow
+  File "D:\dev\swatchon_chat\ui\main_window.py", line 16, in <module>
+    from core.config import ConfigManager
+  File "D:\dev\swatchon_chat\core\config.py", line 10, in <module>
+    from core.constants import DEFAULT_CONFIG_PATH, USER_DATA_DIR, ConfigKey, SpreadsheetConfigKey, FBO_PO_URL
+ImportError: cannot import name 'FBO_PO_URL' from 'core.constants' (D:\dev\swatchon_chat\core\constants.py)
+
+===================
+
+=== 전역 예외 발생 ===
+시간: 2025-06-17 13:56:30
+타입: <class 'ImportError'>
+값: cannot import name 'FBO_PO_URL' from 'core.constants' (D:\dev\swatchon_chat\core\constants.py)
+Traceback (most recent call last):
+  File "D:\dev\swatchon_chat\main.py", line 42, in <module>
+    from ui.main_window import MainWindow
+  File "D:\dev\swatchon_chat\ui\__init__.py", line 4, in <module>
+    from ui.main_window import MainWindow
+  File "D:\dev\swatchon_chat\ui\main_window.py", line 16, in <module>
+    from core.config import ConfigManager
+  File "D:\dev\swatchon_chat\core\config.py", line 10, in <module>
+    from core.constants import DEFAULT_CONFIG_PATH, USER_DATA_DIR, ConfigKey, SpreadsheetConfigKey, FBO_PO_URL
+ImportError: cannot import name 'FBO_PO_URL' from 'core.constants' (D:\dev\swatchon_chat\core\constants.py)
+
+===================
+
+=== 전역 예외 발생 ===
+시간: 2025-06-17 13:56:57
+타입: <class 'ModuleNotFoundError'>
+값: No module named 'ui.sections.fbo.po_section'
+Traceback (most recent call last):
+  File "D:\dev\swatchon_chat\main.py", line 42, in <module>
+    from ui.main_window import MainWindow
+  File "D:\dev\swatchon_chat\ui\__init__.py", line 4, in <module>
+    from ui.main_window import MainWindow
+  File "D:\dev\swatchon_chat\ui\main_window.py", line 22, in <module>
+    from ui.sections.fbo.fbo_po_section import FboPoSection
+  File "D:\dev\swatchon_chat\ui\sections\fbo\__init__.py", line 6, in <module>
+    from ui.sections.fbo.po_section import PoSection
+ModuleNotFoundError: No module named 'ui.sections.fbo.po_section'
+
+===================
+
+=== 전역 예외 발생 ===
+시간: 2025-06-17 14:07:18
+타입: <class 'ImportError'>
+값: cannot import name 'LOG_INFO' from 'core.constants' (D:\dev\swatchon_chat\core\constants.py)
+Traceback (most recent call last):
+  File "D:\dev\swatchon_chat\main.py", line 42, in <module>
+    from ui.main_window import MainWindow
+  File "D:\dev\swatchon_chat\ui\__init__.py", line 4, in <module>
+    from ui.main_window import MainWindow
+  File "D:\dev\swatchon_chat\ui\main_window.py", line 22, in <module>
+    from ui.sections.fbo.fbo_po_section import FboPoSection
+  File "D:\dev\swatchon_chat\ui\sections\fbo\__init__.py", line 6, in <module>
+    from ui.sections.fbo.fbo_po_section import FboPoSection
+  File "D:\dev\swatchon_chat\ui\sections\fbo\fbo_po_section.py", line 15, in <module>
+    from services.fbo_po_scraper import FboPoScraper
+  File "D:\dev\swatchon_chat\services\fbo_po_scraper.py", line 10, in <module>
+    from core.constants import LOG_INFO, LOG_ERROR, FBO_PO_URL
+ImportError: cannot import name 'LOG_INFO' from 'core.constants' (D:\dev\swatchon_chat\core\constants.py)
+
+===================
+
+=== 전역 예외 발생 ===
+시간: 2025-06-17 14:12:05
+타입: <class 'ImportError'>
+값: cannot import name 'FboShipmentRequestSection' from 'ui.sections.fbo.shipment_request_section' (D:\dev\swatchon_chat\ui\sections\fbo\shipment_request_section.py)
+Traceback (most recent call last):
+  File "D:\dev\swatchon_chat\main.py", line 42, in <module>
+    from ui.main_window import MainWindow
+  File "D:\dev\swatchon_chat\ui\__init__.py", line 4, in <module>
+    from ui.main_window import MainWindow
+  File "D:\dev\swatchon_chat\ui\main_window.py", line 23, in <module>
+    from ui.sections.fbo.shipment_request_section import FboShipmentRequestSection
+ImportError: cannot import name 'FboShipmentRequestSection' from 'ui.sections.fbo.shipment_request_section' (D:\dev\swatchon_chat\ui\sections\fbo\shipment_request_section.py)
+
+===================
+
+=== 전역 예외 발생 ===
+시간: 2025-06-17 14:13:46
+타입: <class 'ModuleNotFoundError'>
+값: No module named 'ui.sections.address_book_section'
+Traceback (most recent call last):
+  File "D:\dev\swatchon_chat\main.py", line 42, in <module>
+    from ui.main_window import MainWindow
+  File "D:\dev\swatchon_chat\ui\__init__.py", line 4, in <module>
+    from ui.main_window import MainWindow
+  File "D:\dev\swatchon_chat\ui\main_window.py", line 24, in <module>
+    from ui.sections.address_book_section import AddressBookSection
+ModuleNotFoundError: No module named 'ui.sections.address_book_section'
+
+===================
+
+=== 전역 예외 발생 ===
+시간: 2025-06-17 14:14:33
+타입: <class 'ModuleNotFoundError'>
+값: No module named 'ui.sections.settings_section'
+Traceback (most recent call last):
+  File "D:\dev\swatchon_chat\main.py", line 42, in <module>
+    from ui.main_window import MainWindow
+  File "D:\dev\swatchon_chat\ui\__init__.py", line 4, in <module>
+    from ui.main_window import MainWindow
+  File "D:\dev\swatchon_chat\ui\main_window.py", line 25, in <module>
+    from ui.sections.settings_section import SettingsSection
+ModuleNotFoundError: No module named 'ui.sections.settings_section'
+
+===================
+
+=== 전역 예외 발생 ===
+시간: 2025-06-17 14:41:21
+타입: <class 'IndentationError'>
+값: unexpected indent (log_widget.py, line 150)
+Traceback (most recent call last):
+  File "D:\dev\swatchon_chat\main.py", line 42, in <module>
+    from ui.main_window import MainWindow
+  File "D:\dev\swatchon_chat\ui\__init__.py", line 4, in <module>
+    from ui.main_window import MainWindow
+  File "D:\dev\swatchon_chat\ui\main_window.py", line 19, in <module>
+    from ui.components.sidebar import Sidebar
+  File "D:\dev\swatchon_chat\ui\components\__init__.py", line 4, in <module>
+    from ui.components.log_widget import LogWidget
+  File "D:\dev\swatchon_chat\ui\components\log_widget.py", line 150
+    cursor.insertText(msg)
+IndentationError: unexpected indent
+
+===================
+
+=== 전역 예외 발생 ===
+시간: 2025-06-17 14:43:23
+타입: <class 'SyntaxError'>
+값: expected 'except' or 'finally' block (message_manager.py, line 505)
+Traceback (most recent call last):
+  File "D:\dev\swatchon_chat\main.py", line 42, in <module>
+    from ui.main_window import MainWindow
+  File "D:\dev\swatchon_chat\ui\__init__.py", line 4, in <module>
+    from ui.main_window import MainWindow
+  File "D:\dev\swatchon_chat\ui\main_window.py", line 19, in <module>
+    from ui.components.sidebar import Sidebar
+  File "D:\dev\swatchon_chat\ui\components\__init__.py", line 7, in <module>
+    from ui.components.message_manager import MessageManager
+  File "D:\dev\swatchon_chat\ui\components\message_manager.py", line 505
+    if success:
+    ^^
+SyntaxError: expected 'except' or 'finally' block
+
+===================
+
+=== 전역 예외 발생 ===
+시간: 2025-06-17 16:03:53
+타입: <class 'IndentationError'>
+값: unexpected indent (log_widget.py, line 150)
+Traceback (most recent call last):
+  File "D:\dev\swatchon_chat\main.py", line 42, in <module>
+    from ui.main_window import MainWindow
+  File "D:\dev\swatchon_chat\ui\__init__.py", line 4, in <module>
+    from ui.main_window import MainWindow
+  File "D:\dev\swatchon_chat\ui\main_window.py", line 19, in <module>
+    from ui.components.sidebar import Sidebar
+  File "D:\dev\swatchon_chat\ui\components\__init__.py", line 4, in <module>
+    from ui.components.log_widget import LogWidget
+  File "D:\dev\swatchon_chat\ui\components\log_widget.py", line 150
+    cursor.insertText(msg)
+IndentationError: unexpected indent
+
+===================
+
+=== 전역 예외 발생 ===
+시간: 2025-06-17 16:14:34
+타입: <class 'IndentationError'>
+값: expected an indented block after 'else' statement on line 517 (message_manager.py, line 518)
+Traceback (most recent call last):
+  File "D:\dev\swatchon_chat\main.py", line 42, in <module>
+    from ui.main_window import MainWindow
+  File "D:\dev\swatchon_chat\ui\__init__.py", line 4, in <module>
+    from ui.main_window import MainWindow
+  File "D:\dev\swatchon_chat\ui\main_window.py", line 19, in <module>
+    from ui.components.sidebar import Sidebar
+  File "D:\dev\swatchon_chat\ui\components\__init__.py", line 7, in <module>
+    from ui.components.message_manager import MessageManager
+  File "D:\dev\swatchon_chat\ui\components\message_manager.py", line 518
+    if success:
+    ^^
+IndentationError: expected an indented block after 'else' statement on line 517
+
+===================
+
+=== 전역 예외 발생 ===
+시간: 2025-06-17 16:16:19
+타입: <class 'IndentationError'>
+값: expected an indented block after 'else' statement on line 517 (message_manager.py, line 518)
+Traceback (most recent call last):
+  File "D:\dev\swatchon_chat\main.py", line 42, in <module>
+    from ui.main_window import MainWindow
+  File "D:\dev\swatchon_chat\ui\__init__.py", line 4, in <module>
+    from ui.main_window import MainWindow
+  File "D:\dev\swatchon_chat\ui\main_window.py", line 19, in <module>
+    from ui.components.sidebar import Sidebar
+  File "D:\dev\swatchon_chat\ui\components\__init__.py", line 7, in <module>
+    from ui.components.message_manager import MessageManager
+  File "D:\dev\swatchon_chat\ui\components\message_manager.py", line 518
+    if success:
+    ^^
+IndentationError: expected an indented block after 'else' statement on line 517
+
+===================
+
+=== 전역 예외 발생 ===
+시간: 2025-06-17 16:29:18
+타입: <class 'KeyboardInterrupt'>
+값: 
+Traceback (most recent call last):
+  File "D:\dev\swatchon_chat\ui\main_window.py", line 244, in closeEvent
+    section.on_section_deactivated()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "D:\dev\swatchon_chat\ui\sections\fbo\fbo_po_section.py", line 491, in on_section_deactivated
+    thread.wait(3000)
+    ~~~~~~~~~~~^^^^^^
+KeyboardInterrupt
+
+===================
+
+=== 전역 예외 발생 ===
+시간: 2025-06-17 16:43:12
+타입: <class 'IndentationError'>
+값: unexpected indent (log_widget.py, line 153)
+Traceback (most recent call last):
+  File "D:\dev\swatchon_chat\main.py", line 42, in <module>
+    from ui.main_window import MainWindow
+  File "D:\dev\swatchon_chat\ui\__init__.py", line 4, in <module>
+    from ui.main_window import MainWindow
+  File "D:\dev\swatchon_chat\ui\main_window.py", line 19, in <module>
+    from ui.components.sidebar import Sidebar
+  File "D:\dev\swatchon_chat\ui\components\__init__.py", line 4, in <module>
+    from ui.components.log_widget import LogWidget
+  File "D:\dev\swatchon_chat\ui\components\log_widget.py", line 153
+    cursor.insertText(msg)
+IndentationError: unexpected indent
+
+===================
+
+=== 전역 예외 발생 ===
+시간: 2025-06-17 16:43:56
+타입: <class 'IndentationError'>
+값: expected an indented block after 'else' statement on line 517 (message_manager.py, line 518)
+Traceback (most recent call last):
+  File "D:\dev\swatchon_chat\main.py", line 42, in <module>
+    from ui.main_window import MainWindow
+  File "D:\dev\swatchon_chat\ui\__init__.py", line 4, in <module>
+    from ui.main_window import MainWindow
+  File "D:\dev\swatchon_chat\ui\main_window.py", line 19, in <module>
+    from ui.components.sidebar import Sidebar
+  File "D:\dev\swatchon_chat\ui\components\__init__.py", line 7, in <module>
+    from ui.components.message_manager import MessageManager
+  File "D:\dev\swatchon_chat\ui\components\message_manager.py", line 518
+    if success:
+    ^^
+IndentationError: expected an indented block after 'else' statement on line 517
+
+===================
+
+=== 전역 예외 발생 ===
+시간: 2025-06-17 16:44:08
+타입: <class 'IndentationError'>
+값: expected an indented block after 'else' statement on line 517 (message_manager.py, line 518)
+Traceback (most recent call last):
+  File "D:\dev\swatchon_chat\main.py", line 42, in <module>
+    from ui.main_window import MainWindow
+  File "D:\dev\swatchon_chat\ui\__init__.py", line 4, in <module>
+    from ui.main_window import MainWindow
+  File "D:\dev\swatchon_chat\ui\main_window.py", line 19, in <module>
+    from ui.components.sidebar import Sidebar
+  File "D:\dev\swatchon_chat\ui\components\__init__.py", line 7, in <module>
+    from ui.components.message_manager import MessageManager
+  File "D:\dev\swatchon_chat\ui\components\message_manager.py", line 518
+    if success:
+    ^^
+IndentationError: expected an indented block after 'else' statement on line 517
+
+===================
+
+=== 전역 예외 발생 ===
+시간: 2025-06-17 16:47:37
+타입: <class 'IndentationError'>
+값: expected an indented block after 'if' statement on line 97 (data_manager.py, line 99)
+Traceback (most recent call last):
+  File "D:\dev\swatchon_chat\main.py", line 42, in <module>
+    from ui.main_window import MainWindow
+  File "D:\dev\swatchon_chat\ui\__init__.py", line 4, in <module>
+    from ui.main_window import MainWindow
+  File "D:\dev\swatchon_chat\ui\main_window.py", line 19, in <module>
+    from ui.components.sidebar import Sidebar
+  File "D:\dev\swatchon_chat\ui\components\__init__.py", line 8, in <module>
+    from ui.components.data_manager import DataManager
+  File "D:\dev\swatchon_chat\ui\components\data_manager.py", line 99
+    return self._load_cached_data_with_status_preservation(cached_file)
+    ^^^^^^
+IndentationError: expected an indented block after 'if' statement on line 97
+
+===================

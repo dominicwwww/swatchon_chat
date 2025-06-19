@@ -57,6 +57,7 @@ class BaseScraper:
         self.shipment_request_url = self.receive_url
         self.shipment_confirm_url = self.receive_url
         
+        # 최신 webdriver-manager 4.0.2 사용
         self.webdriver_path = ChromeDriverManager().install()
         self.log_function = None
         

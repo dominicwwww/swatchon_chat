@@ -1,12 +1,12 @@
 """
 로그 위젯 컴포넌트 - 로그 메시지 표시
 """
-from typing import Optional
+from typing import Optional, List, Tuple
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QPlainTextEdit, QHBoxLayout, 
     QPushButton, QLabel, QFrame
 )
-from PySide6.QtCore import Qt, Signal, QSize
+from PySide6.QtCore import Qt, Signal, QSize, QTimer
 from PySide6.QtGui import QFont, QColor, QTextCharFormat, QTextCursor, QIcon
 
 from core.types import LogType
@@ -60,7 +60,7 @@ class LogWidget(QWidget):
         # 로그 텍스트 영역
         self.log_text = QPlainTextEdit()
         self.log_text.setReadOnly(True)
-        self.log_text.setMaximumBlockCount(1000)  # 최대 로그 줄 수 제한 (10000 -> 1000으로 감소)
+        self.log_text.setMaximumBlockCount(1000)  # 최대 로그 줄 수 제한
         self.log_text.setMinimumHeight(400)  # 최소 높이 설정
         
         # 글꼴 설정
@@ -96,6 +96,15 @@ class LogWidget(QWidget):
         
         # 초기 스타일 적용
         self._update_style()
+        
+        # 로그 버퍼링 설정
+        self._log_buffer: List[Tuple[str, str]] = []
+        self._buffer_timer = QTimer()
+        self._buffer_timer.timeout.connect(self._flush_buffer)
+        self._buffer_timer.start(100)  # 100ms마다 버퍼 플러시
+        
+        # 예외 처리 플래그
+        self._handling_exception = False
     
     def _update_style(self):
         """테마에 맞게 스타일 업데이트"""
@@ -115,51 +124,70 @@ class LogWidget(QWidget):
             }}
         """)
     
-    def add_log(self, message: str, log_type: str = LOG_INFO):
-        """로그 메시지 추가"""
+    def _add_log_internal(self, message: str, log_type: str = LOG_INFO):
+        """내부 로그 추가 메서드 (버퍼링 없이 직접 추가)"""
         try:
-            # 메시지 길이 제한
-            if len(message) > MAX_LOG_MESSAGE_LENGTH:
-                message = message[:MAX_LOG_MESSAGE_LENGTH] + "... (생략됨)"
-            
-            # 텍스트 포맷 설정
-            format = QTextCharFormat()
-            
-            # log_type에 따라 미리 정의된 색상 사용
-            color = self.log_colors.get(log_type, QColor("#CDD6F4"))
-            format.setForeground(color)
-            
-            # 성공 또는 오류 로그는 굵게 표시
-            if log_type in [LOG_SUCCESS, LOG_ERROR]:
-                format.setFontWeight(QFont.Bold)
-            
-            # 현재 문서에 텍스트가 있으면 개행 추가
-            text = self.log_text.toPlainText()
-            if text and not text.endswith("\n"):
-                message = "\n" + message
-            
-            # 커서 생성 및 끝으로 이동
-            cursor = self.log_text.textCursor()
-            cursor.movePosition(QTextCursor.MoveOperation.End)
-            
-            # 포맷 적용하여 메시지 추가
-            cursor.setCharFormat(format)
-            cursor.insertText(message)
-            
-            # 커서를 항상 문서 끝으로 이동
-            self.log_text.setTextCursor(cursor)
-            self.log_text.ensureCursorVisible()
-            
-            # 터미널에도 로그 출력 (디버깅용)
-            print(f"[LOG] {message}")
-            
+            # 여러 줄 메시지 처리: 빈 줄/공백만 있는 줄은 무시
+            for line in str(message).splitlines():
+                if not line.strip():
+                    continue
+                
+                # 메시지 길이 제한
+                msg = line
+                if len(msg) > MAX_LOG_MESSAGE_LENGTH:
+                    msg = msg[:MAX_LOG_MESSAGE_LENGTH] + "... (생략됨)"
+                
+                # 텍스트 포맷 설정
+                format = QTextCharFormat()
+                color = self.log_colors.get(log_type, QColor("#CDD6F4"))
+                format.setForeground(color)
+                if log_type in [LOG_SUCCESS, LOG_ERROR]:
+                    format.setFontWeight(QFont.Bold)
+                
+                text = self.log_text.toPlainText()
+                if text and not text.endswith("\n"):
+                    msg = "\n" + msg
+                
+                cursor = self.log_text.textCursor()
+                cursor.movePosition(QTextCursor.MoveOperation.End)
+                cursor.setCharFormat(format)
+                cursor.insertText(msg)
+                
+                self.log_text.setTextCursor(cursor)
+                self.log_text.ensureCursorVisible()
+                print(f"[LOG] {msg}")
+                
         except Exception as e:
-            # 오류가 발생하면 터미널에 출력
-            print(f"로그 추가 중 오류 발생: {str(e)}")
+            if not self._handling_exception:
+                self._handling_exception = True
+                try:
+                    print(f"로그 추가 중 오류 발생: {str(e)}")
+                finally:
+                    self._handling_exception = False
+    
+    def _flush_buffer(self):
+        """로그 버퍼 플러시"""
+        if self._log_buffer:
+            try:
+                for message, log_type in self._log_buffer:
+                    self._add_log_internal(message, log_type)
+            except Exception as e:
+                print(f"로그 버퍼 플러시 중 오류: {str(e)}")
+            finally:
+                self._log_buffer.clear()
+    
+    def add_log(self, message: str, log_type: str = LOG_INFO):
+        """로그 메시지 추가 (버퍼링 사용)"""
+        try:
+            self._log_buffer.append((message, log_type))
+        except Exception as e:
+            # 버퍼링 실패 시 직접 추가
+            self._add_log_internal(message, log_type)
     
     def clear_logs(self):
         """로그 메시지 지우기"""
         self.log_text.clear()
+        self._log_buffer.clear()
     
     def save_logs(self, file_path: str) -> bool:
         """로그 메시지를 파일로 저장"""

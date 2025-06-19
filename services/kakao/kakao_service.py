@@ -326,67 +326,76 @@ class KakaoService:
             bool: 전송 성공 여부
         """
         try:
-            # HTML 태그 처리
             message = self._clean_html_tags(message)
-            
-            # 윈도우에서 실제 메시지 전송
             if platform.system() == "Windows":
                 try:
-                    # 채팅방 검색 및 열기
                     if not self.open_chatroom(chat_room_name):
                         error_msg = f"채팅방 '{chat_room_name}' 을(를) 찾을 수 없습니다."
-                        print(error_msg)  # 터미널에 출력
+                        print(error_msg)
                         if log_function:
-                            log_function(error_msg, "error")
+                            for line in error_msg.splitlines():
+                                if line.strip():
+                                    log_function(line, "error")
                         return False
-
-                    # 메시지 전송
                     result = self._send_text_windows(chat_room_name, message)
-                    
-                    # 채팅방 닫기
                     try:
                         self.close_chatroom(chat_room_name)
                     except Exception as close_error:
                         import traceback
                         error_msg = f"채팅방 닫기 실패:\n{str(close_error)}\n{traceback.format_exc()}"
-                        print(error_msg)  # 터미널에 출력
+                        print(error_msg)
                         if log_function:
-                            log_function(error_msg, "error")
-                        # 채팅방 닫기 실패는 전체 실패로 처리하지 않음
-                    
+                            for line in error_msg.splitlines():
+                                if line.strip():
+                                    log_function(line, "error")
                     if result:
                         if log_function:
-                            log_function(f"메시지가 '{chat_room_name}' 에게 성공적으로 전송되었습니다.", "success")
+                            for line in f"메시지가 '{chat_room_name}' 에게 성공적으로 전송되었습니다.".splitlines():
+                                if line.strip():
+                                    log_function(line, "success")
                     else:
                         error_msg = f"메시지 전송 실패: '{chat_room_name}'"
-                        print(error_msg)  # 터미널에 출력
+                        print(error_msg)
                         if log_function:
-                            log_function(error_msg, "error")
-                    
+                            for line in error_msg.splitlines():
+                                if line.strip():
+                                    log_function(line, "error")
                     return result
                 except Exception as e:
                     import traceback
                     error_msg = f"메시지 전송 중 오류 발생:\n{str(e)}\n{traceback.format_exc()}"
-                    print(error_msg)  # 터미널에 출력
+                    print(error_msg)
                     if log_function:
-                        log_function(error_msg, "error")
+                        for line in error_msg.splitlines():
+                            if line.strip():
+                                log_function(line, "error")
                     return False
             else:
-                # macOS 등 Windows가 아닌 환경
                 if log_function:
-                    log_function(f"[개발 모드] '{chat_room_name}'에게 메시지를 전송합니다:", "info")
-                    log_function(f"--- 메시지 내용 시작 ---", "info")
-                    log_function(message, "info")
-                    log_function(f"--- 메시지 내용 끝 ---", "info")
-                    log_function(f"메시지 길이: {len(message)}자", "info")
-                return True  # 개발 모드에서는 성공으로 처리
-                
+                    for line in f"[개발 모드] '{chat_room_name}'에게 메시지를 전송합니다:".splitlines():
+                        if line.strip():
+                            log_function(line, "info")
+                    for line in "--- 메시지 내용 시작 ---".splitlines():
+                        if line.strip():
+                            log_function(line, "info")
+                    for line in message.splitlines():
+                        if line.strip():
+                            log_function(line, "info")
+                    for line in "--- 메시지 내용 끝 ---".splitlines():
+                        if line.strip():
+                            log_function(line, "info")
+                    for line in f"메시지 길이: {len(message)}자".splitlines():
+                        if line.strip():
+                            log_function(line, "info")
+                return True
         except Exception as e:
             import traceback
             error_msg = f"카카오톡 메시지 전송 중 치명적 오류:\n{str(e)}\n{traceback.format_exc()}"
-            print(error_msg)  # 터미널에 출력
+            print(error_msg)
             if log_function:
-                log_function(error_msg, "error")
+                for line in error_msg.splitlines():
+                    if line.strip():
+                        log_function(line, "error")
             return False 
 
 def send_message_in_subprocess(chat_room_name, message, timeout=15):

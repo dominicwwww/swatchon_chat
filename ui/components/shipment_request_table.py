@@ -335,14 +335,10 @@ class ShipmentRequestTable(QTableWidget):
                             key = header.text() if header else str(col)
                             cell_item = self.item(row, col)
                             item_data[key] = cell_item.text() if cell_item else None
-                        # id, store_name, purchase_code 등 주요 필드는 기존대로 추가
+                        # id 필드 추가 (컬럼 2에 있는 ID 값 사용)
                         id_item = self.item(row, 2)
-                        store_item = self.item(row, 3)
-                        purchase_item = self.item(row, 11)
-                        if id_item and store_item and purchase_item:
-                            item_data["id"] = int(id_item.text())
-                            item_data["store_name"] = store_item.text()
-                            item_data["purchase_code"] = purchase_item.text()
+                        if id_item:
+                            item_data['id'] = int(id_item.text())
                         selected_items.append(item_data)
                     except (ValueError, AttributeError) as e:
                         print(f"행 {row} 데이터 수집 중 오류: {e}")

@@ -493,18 +493,6 @@ class ShipmentRequestSection(BaseSection):
                 
                 # 메시지 전송
                 try:
-                    # 다음 판매자 정보 로깅
-                    preview_data = self.message_manager.get_preview_data()
-                    if preview_data:
-                        remaining_sellers = list(preview_data.keys())
-                        if remaining_sellers:
-                            next_seller = remaining_sellers[0]
-                            seller_info = preview_data[next_seller]
-                            self.log(f"\n다음 전송 예정 판매자: {next_seller}", LOG_INFO)
-                            self.log(f"채팅방 이름: {seller_info.get('chat_room_name', 'N/A')}", LOG_INFO)
-                            self.log(f"메시지 길이: {len(seller_info.get('message', ''))}자", LOG_INFO)
-                            self.log(f"전송할 항목 수: {len(seller_info.get('items', []))}개", LOG_INFO)
-                    
                     # 메시지 전송 시도
                     self.message_manager.send_messages(
                         update_status_callback=self._update_item_status

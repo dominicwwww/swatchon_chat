@@ -37,6 +37,7 @@
     0
   ],
   "receive_scraping_url": "https://admin.swatchon.me/purchase_products/receive_index",
+  "fbo_po_url": "https://admin.swatchon.me/purchases?q%5Bcode_eq%5D=&q%5Bpurchase_store_type_eq%5D=&q%5Border_code_cont%5D=&q%5Bstore_name_cont%5D=&is_unit_price_changed_eq=&q%5Border_allowed_delay_leadtime_not_null%5D=&q%5Btanker_id_eq%5D=&q%5Bstatus_eq%5D=requested&q%5Bsettlement_status_eq%5D=&commit=%EA%B2%80%EC%83%89",
   "default_templates": {
     "fbo": {
       "shipment_request": {
@@ -46,9 +47,16 @@
           "order_details",
           "store_name"
         ],
-        "conditions": [],
+        "conditions": [
+          {
+            "field": "pickup_at",
+            "operator": "<",
+            "value": "{today}",
+            "template": "[출고 확인-{store_name}]\n안녕하세요!\n출고일이 지났지만 아직 물류센터에 입고 되지 않아 출고 여부 확인 부탁 드립니다.\n\n{order_details}\n\nhttps://partners.swatchon.com/purchases/products/need-sent?page=1"
+          }
+        ],
         "order_details_format": "[{quality_name}] | 컬러코드 #{color_code} | 컬러순서 #{color_number} | {quantity}yd | {pickup_at} | {delivery_method}-{logistics_company}",
-        "last_modified": "2025-06-16T12:15:10.214410"
+        "last_modified": "2025-06-18T13:59:14.733063"
       },
       "shipment_confirm": {
         "title": "FBO 출고 확인",

@@ -19,6 +19,7 @@ from ui.theme import get_theme
 from ui.components.sidebar import Sidebar
 from ui.components.control_bar import ControlBar
 from ui.sections.base_section import BaseSection
+from ui.sections.fbo.fbo_po_section import FboPoSection
 
 class MainWindow(QMainWindow):
     """
@@ -118,11 +119,11 @@ class MainWindow(QMainWindow):
             # FBO 섹션
             from ui.sections.fbo.shipment_request_section import ShipmentRequestSection
             from ui.sections.fbo.shipment_confirm_section import ShipmentConfirmSection
-            from ui.sections.fbo.po_section import PoSection
+            from ui.sections.fbo.fbo_po_section import FboPoSection
             
             self._add_section(SectionType.FBO_SHIPMENT_REQUEST.value, ShipmentRequestSection())
             self._add_section(SectionType.FBO_SHIPMENT_CONFIRM.value, ShipmentConfirmSection())
-            self._add_section(SectionType.FBO_PO.value, PoSection())
+            self._add_section(SectionType.FBO_PO.value, FboPoSection())
             
             # SBO 섹션
             from ui.sections.sbo.po_section import SboPoSection

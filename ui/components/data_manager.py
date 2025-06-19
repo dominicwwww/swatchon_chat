@@ -64,6 +64,9 @@ class DataManager(QObject):
         self.all_data: List[PurchaseProduct] = []
         self.filtered_data: List[PurchaseProduct] = []
         
+        # 발주프로덕트 데이터 저장소 추가
+        self.purchase_products: Dict[str, List[Dict[str, Any]]] = {}  # 발주번호별 프로덕트 목록
+        
         # 필터 상태
         self.current_search_text = ""
         self.current_status_filter = "all"
@@ -90,8 +93,11 @@ class DataManager(QObject):
             cached_file = self._get_today_cache_file()
             if cached_file and os.path.exists(cached_file):
                 self.log(f"오늘 날짜 ({today})의 캐시 파일을 발견했습니다: {os.path.basename(cached_file)}", LOG_INFO)
-                # 캐시된 데이터를 로드하되, 메시지 상태는 유지
-                return self._load_cached_data_with_status_preservation(cached_file)
+                # 기존 캐시 파일이 있는 경우, API 데이터와 비교 병합
+                if not self._load_and_merge_with_api(cached_file):
+                    # API 병합 실패 시 캐시만 로드
+                    return self._load_cached_data_with_status_preservation(cached_file)
+                return True
             
             self.log(f"{self.order_type.value} 데이터를 API에서 새로고침합니다.", LOG_INFO)
             
@@ -131,11 +137,17 @@ class DataManager(QObject):
             
             self.log(f"오늘 날짜까지의 데이터 {len(purchase_products)}건을 필터링했습니다.", LOG_INFO)
             
-            # 기존 메시지 상태 보존
-            purchase_products = self._preserve_existing_message_status(purchase_products)
+            # 기존 데이터와 병합 (새로운 방식)
+            merged_data, stats = self.merge_data_with_existing(purchase_products)
+            
+            # 로그 출력
+            if stats['new_count'] > 0 or stats['updated_count'] > 0:
+                self.log(f"데이터 업데이트 - 신규: {stats['new_count']}건, 변경: {stats['updated_count']}건, 유지: {stats['unchanged_count']}건", LOG_SUCCESS)
+            else:
+                self.log(f"변경사항 없음 - 총 {stats['total_count']}건", LOG_INFO)
             
             # 데이터 저장
-            self.all_data = purchase_products
+            self.all_data = merged_data
             self.filtered_data = self.all_data.copy()
             self.current_data_date = today
             
@@ -265,6 +277,91 @@ class DataManager(QObject):
             self.log(f"{preserved_count}개 항목의 메시지 상태를 보존했습니다.", LOG_INFO)
         
         return new_data
+    
+    def merge_data_with_existing(self, new_data: List[PurchaseProduct]) -> tuple[List[PurchaseProduct], dict]:
+        """
+        새 데이터와 기존 데이터를 병합하고 변경 통계 반환
+        
+        Args:
+            new_data: 새로 가져온 데이터
+            
+        Returns:
+            tuple: (병합된 데이터, 통계 정보)
+        """
+        if not self.all_data:
+            # 기존 데이터가 없으면 모두 새 데이터
+            return new_data, {
+                'new_count': len(new_data),
+                'updated_count': 0,
+                'unchanged_count': 0,
+                'total_count': len(new_data)
+            }
+        
+        # 기존 데이터를 ID로 매핑
+        existing_map = {item.id: item for item in self.all_data}
+        
+        updated_count = 0
+        new_count = 0
+        unchanged_count = 0
+        merged_data = []
+        
+        # 새 데이터 처리
+        for new_item in new_data:
+            if new_item.id in existing_map:
+                existing_item = existing_map[new_item.id]
+                
+                # 데이터 변경 여부 확인
+                if self._has_purchase_product_changed(existing_item, new_item):
+                    # 메시지 상태는 기존 것 유지
+                    new_item.message_status = getattr(existing_item, 'message_status', ShipmentStatus.PENDING.value)
+                    new_item.processed_at = getattr(existing_item, 'processed_at', None)
+                    merged_data.append(new_item)
+                    updated_count += 1
+                else:
+                    # 변경되지 않았으면 기존 데이터 유지
+                    merged_data.append(existing_item)
+                    unchanged_count += 1
+            else:
+                # 새로운 항목
+                new_item.message_status = ShipmentStatus.PENDING.value
+                new_item.processed_at = None
+                merged_data.append(new_item)
+                new_count += 1
+        
+        stats = {
+            'new_count': new_count,
+            'updated_count': updated_count,
+            'unchanged_count': unchanged_count,
+            'total_count': len(merged_data)
+        }
+        
+        return merged_data, stats
+    
+    def _has_purchase_product_changed(self, existing: PurchaseProduct, new: PurchaseProduct) -> bool:
+        """두 PurchaseProduct 객체가 변경되었는지 비교 (메시지 상태 제외)"""
+        # 비교할 중요한 필드들
+        compare_fields = [
+            'store_name', 'store_address', 'store_ddm_address', 'quality_name',
+            'color_code', 'quantity', 'purchase_code', 'pickup_at', 
+            'delivery_method', 'logistics_company', 'status'
+        ]
+        
+        for field in compare_fields:
+            existing_val = getattr(existing, field, None)
+            new_val = getattr(new, field, None)
+            
+            # 날짜 필드는 문자열로 변환해서 비교
+            if field == 'pickup_at':
+                if hasattr(existing_val, 'date') and hasattr(new_val, 'date'):
+                    existing_val = existing_val.date()
+                    new_val = new_val.date()
+                elif isinstance(existing_val, str) and isinstance(new_val, str):
+                    pass  # 문자열이면 그대로 비교
+            
+            if existing_val != new_val:
+                return True
+        
+        return False
     
     def _map_api_response_to_product_data(self, item: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -564,3 +661,163 @@ class DataManager(QObject):
         self.filtered_data = []
         self.current_search_text = ""
         self.current_status_filter = "all" 
+    
+    def _load_and_merge_with_api(self, cached_file: str) -> bool:
+        """캐시된 데이터를 로드하고 API 데이터와 병합"""
+        try:
+            # 먼저 캐시된 데이터 로드 (기존 상태 유지)
+            if not self._load_cached_data_with_status_preservation(cached_file):
+                return False
+            
+            self.log("API에서 최신 데이터를 가져와 기존 데이터와 비교합니다...", LOG_INFO)
+            
+            # API 호출
+            items = self.api_service.get_purchase_products()
+            if not items:
+                self.log("API 호출 실패, 캐시된 데이터만 사용합니다.", LOG_WARNING)
+                return True  # 캐시된 데이터라도 성공
+            
+            # 새 데이터 변환
+            new_purchase_products = []
+            today_date = date.today()
+            
+            for item in items:
+                try:
+                    product_data = self._map_api_response_to_product_data(item)
+                    
+                    # pickup_at이 오늘 날짜까지인 데이터만 필터링
+                    pickup_date = product_data['pickup_at']
+                    if isinstance(pickup_date, datetime):
+                        pickup_date = pickup_date.date()
+                    elif isinstance(pickup_date, str):
+                        try:
+                            pickup_date = datetime.strptime(pickup_date, '%Y-%m-%d').date()
+                        except ValueError:
+                            continue
+                    
+                    if pickup_date <= today_date:
+                        product = PurchaseProduct(**product_data)
+                        new_purchase_products.append(product)
+                    
+                except Exception as e:
+                    self.log(f"데이터 변환 실패: {str(e)}", LOG_WARNING)
+                    continue
+            
+            # 기존 캐시 데이터와 새 API 데이터 병합
+            merged_data, stats = self.merge_data_with_existing(new_purchase_products)
+            
+            # 변경사항이 있는 경우에만 업데이트
+            if stats['new_count'] > 0 or stats['updated_count'] > 0:
+                self.log(f"데이터 업데이트 - 신규: {stats['new_count']}건, 변경: {stats['updated_count']}건, 유지: {stats['unchanged_count']}건", LOG_SUCCESS)
+                
+                # 데이터 저장
+                self.all_data = merged_data
+                self.filtered_data = self.all_data.copy()
+                
+                # 캐시 파일 다시 저장
+                self._save_today_cache_file()
+                
+                # 시그널 발생
+                self.data_loaded.emit(self.all_data)
+            else:
+                self.log(f"변경사항 없음 - 총 {stats['total_count']}건", LOG_INFO)
+            
+            return True
+            
+        except Exception as e:
+            self.log(f"데이터 병합 중 오류: {str(e)}", LOG_ERROR)
+            return False 
+    
+    def save_purchase_products(self, purchase_code: str, products: List[Dict[str, Any]]) -> bool:
+        """
+        발주프로덕트 데이터를 저장
+        
+        Args:
+            purchase_code: 발주번호
+            products: 프로덕트 목록
+            
+        Returns:
+            bool: 저장 성공 여부
+        """
+        try:
+            # 메모리에 저장
+            self.purchase_products[purchase_code] = products
+            
+            # 파일로도 저장 (발주번호별 개별 파일)
+            today = date.today().strftime('%y%m%d')
+            timestamp = datetime.now().strftime('%H%M')
+            filename = f'fbo_products_{purchase_code}_{today}-{timestamp}.json'
+            file_path = os.path.join(self.data_dir, filename)
+            
+            # 기존 해당 발주번호 파일들 삭제
+            existing_files = glob.glob(os.path.join(self.data_dir, f'fbo_products_{purchase_code}_*.json'))
+            for old_file in existing_files:
+                try:
+                    os.remove(old_file)
+                except:
+                    pass
+            
+            with open(file_path, 'w', encoding='utf-8') as f:
+                json.dump(products, f, ensure_ascii=False, indent=2)
+            
+            self.log(f"발주번호 {purchase_code}의 프로덕트 데이터를 저장했습니다: {filename}", LOG_SUCCESS)
+            return True
+            
+        except Exception as e:
+            self.log(f"발주프로덕트 데이터 저장 중 오류: {str(e)}", LOG_ERROR)
+            return False
+    
+    def load_purchase_products(self, purchase_code: str) -> List[Dict[str, Any]]:
+        """
+        발주프로덕트 데이터를 로드
+        
+        Args:
+            purchase_code: 발주번호
+            
+        Returns:
+            List[Dict[str, Any]]: 프로덕트 목록
+        """
+        try:
+            # 메모리에서 먼저 확인
+            if purchase_code in self.purchase_products:
+                return self.purchase_products[purchase_code]
+            
+            # 파일에서 로드
+            pattern = os.path.join(self.data_dir, f'fbo_products_{purchase_code}_*.json')
+            files = glob.glob(pattern)
+            
+            if files:
+                # 가장 최신 파일 사용
+                latest_file = max(files, key=os.path.getmtime)
+                
+                with open(latest_file, 'r', encoding='utf-8') as f:
+                    products = json.load(f)
+                
+                # 메모리에 캐시
+                self.purchase_products[purchase_code] = products
+                
+                self.log(f"발주번호 {purchase_code}의 프로덕트 데이터를 로드했습니다: {len(products)}건", LOG_INFO)
+                return products
+            
+            # 데이터가 없으면 빈 리스트 반환
+            return []
+            
+        except Exception as e:
+            self.log(f"발주프로덕트 데이터 로드 중 오류: {str(e)}", LOG_ERROR)
+            return []
+    
+    def get_all_purchase_products(self) -> Dict[str, List[Dict[str, Any]]]:
+        """모든 발주프로덕트 데이터 반환"""
+        return self.purchase_products
+    
+    def clear_purchase_products(self, purchase_code: str = None):
+        """발주프로덕트 데이터 삭제
+        
+        Args:
+            purchase_code: 특정 발주번호 (None이면 전체 삭제)
+        """
+        if purchase_code:
+            if purchase_code in self.purchase_products:
+                del self.purchase_products[purchase_code]
+        else:
+            self.purchase_products.clear() 
