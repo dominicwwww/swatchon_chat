@@ -5,7 +5,8 @@ Pydantic 스키마 모듈
 from datetime import date, datetime
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field, validator
-from core.types import MessageStatus
+from core.types import MessageStatus, OrderType
+from enum import Enum
 
 
 class ShipmentItem(BaseModel):
@@ -130,11 +131,17 @@ class PurchaseProduct(BaseModel):
     purchase_url: Optional[str] = Field(None, description="구매 상세 URL")
     last_pickup_at: Optional[datetime] = Field(None, description="최종 픽업 일시")
     pickup_at: datetime = Field(..., description="픽업 일시")
-    delivery_method: str = Field(..., description="배송 방법")
+    delivery_method: Optional[str] = Field(None, description="배송 방법")
     logistics_company: Optional[str] = Field(None, description="물류 회사")
-    status: str = Field("", description="발주 상태")
+    status: str = Field("", description="발주 상태")  # 예: requested(발주요청중), confirmed(발주확정), cancelled(발주취소)
     message_status: str = Field(MessageStatus.PENDING.value, description="메시지 전송 상태")
     processed_at: Optional[datetime] = Field(None, description="처리 시각")
+    price: Optional[str] = Field(None, description="총 가격")
+    unit_price: Optional[str] = Field(None, description="단가")
+    unit_price_origin: Optional[str] = Field(None, description="원본 단가")
+    additional_info: Optional[str] = Field(None, description="추가 정보")
+    created_at: Optional[datetime] = Field(None, description="생성 시각")
+    updated_at: Optional[datetime] = Field(None, description="수정 시각")
 
     class Config:
         """Pydantic 설정"""
@@ -146,4 +153,38 @@ class PurchaseProduct(BaseModel):
 class PurchaseProductList(BaseModel):
     """구매 상품 목록 스키마"""
     items: List[PurchaseProduct] = Field(default_factory=list)
+    total: int = Field(0, description="전체 개수")
+
+
+class PurchaseConfirm(BaseModel):
+    """발주 확인 스키마 - API 응답 데이터 매핑용"""
+    purchase_code: str = Field(..., description="발주번호")
+    purchase_type: str = Field("", description="발주 거래타입")
+    created_at: str = Field("", description="생성시각")
+    order_code: str = Field("", description="주문번호")
+    seller: str = Field("", description="판매자")
+    in_charge: str = Field("", description="발주담당자")
+    quantity: str = Field("", description="발주수량")
+    price: str = Field("", description="공급가액")
+    price_changeable: str = Field("", description="단가변경여부")
+    delay_allowable: str = Field("", description="지연허용여부")
+    status: str = Field("", description="상태")
+    payment_status: str = Field("", description="정산상태")
+    internal_memo: str = Field("", description="내부메모")
+    message_status: str = Field(MessageStatus.PENDING.value, description="메시지 전송 상태")
+    processed_at: Optional[datetime] = Field(None, description="처리 시각")
+    
+    # 확장용 프로덕트 데이터
+    products: List[PurchaseProduct] = Field(default_factory=list, description="발주 프로덕트 목록")
+    
+    class Config:
+        """Pydantic 설정"""
+        json_encoders = {
+            datetime: lambda v: v.isoformat() if v else None,
+        }
+
+
+class PurchaseConfirmList(BaseModel):
+    """발주 확인 목록 스키마"""
+    items: List[PurchaseConfirm] = Field(default_factory=list)
     total: int = Field(0, description="전체 개수") 

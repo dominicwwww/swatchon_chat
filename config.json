@@ -56,7 +56,7 @@
           }
         ],
         "order_details_format": "[{quality_name}] | 컬러코드 #{color_code} | 컬러순서 #{color_number} | {quantity}yd | {pickup_at} | {delivery_method}-{logistics_company}",
-        "last_modified": "2025-06-18T13:59:14.733063"
+        "last_modified": "2025-06-27T11:30:39.104199"
       },
       "shipment_confirm": {
         "title": "FBO 출고 확인",
@@ -70,14 +70,14 @@
       },
       "po": {
         "title": "FBO 발주 확인 요청",
-        "content": "[발주 확인 요청-{seller_name}]\n안녕하세요!\n다음 발주의 확인을 요청드립니다.\n\n- 발주번호: {po_number}\n- 상품명: {product_name}\n- 수량: {quantity}개\n\n감사합니다.",
+        "content": "[주문 확인 요청-{store_name}]\n안녕하세요!\n주문 확인 부탁 드립니다.\n\n{order_details}\n\n- 주문 확인 링크:\nhttps://partners.swatchon.com/purchases?page=1",
         "variables": [
-          "seller_name",
-          "po_number",
-          "product_name",
-          "quantity"
+          "store_name",
+          "order_details"
         ],
-        "last_modified": "2024-03-26T12:09:17.721745"
+        "conditions": [],
+        "order_details_format": "[{quality_name}] | 컬러코드 #{color_code} | 컬러순서 #{color_number} | {quantity}yd | 단가 {unit_price_origin} | 합계 {price}",
+        "last_modified": "2025-06-27T13:36:06.504217"
       }
     },
     "sbo": {

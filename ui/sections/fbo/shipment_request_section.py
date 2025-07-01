@@ -187,23 +187,38 @@ class ShipmentRequestSection(BaseSection):
             if isinstance(item.quantity, (int, float)) and item.quantity >= 50
         ]
         
+        # 전체 프로덕트 정보 추가
+        total_product_count = len(self._selected_items)
+        total_unique_qualities = len(set(item.quality_code for item in self._selected_items if item.quality_code))
+        
         if large_quantity_items:
             # swatch_storage 기준으로 정렬
             sorted_items = sorted(large_quantity_items, key=lambda x: str(x.swatch_storage or ""))
             
             # 보관함이 있는 항목만 카운트
             storage_items = [item for item in large_quantity_items if item.swatch_storage]
-            product_count = len(storage_items)
-            unique_qualities = len(set(item.quality_code for item in storage_items if item.quality_code))
+            large_product_count = len(storage_items)
+            large_unique_qualities = len(set(item.quality_code for item in storage_items if item.quality_code))
             
             # pickup_at이 가장 빠른 날짜의 형식으로 헤더 생성 (하루 더하기)
             if sorted_items:
                 from datetime import timedelta
-                first_pickup = sorted_items[0].pickup_at + timedelta(days=1)
-                header_date = first_pickup.strftime('%m/%d')
-                self.log(f"\n[{header_date} 50yd 이상 입고 예정: {product_count} 프로덕트 / {unique_qualities} 퀄리티]", LOG_INFO)
-                self.log("스와치 보관함 (스와치 제공 여부) - 퀄리티 (컬러 순서) - 발주번호 - 주문번호 - 판매자 - 수량", LOG_INFO)
-                self.log("\n", LOG_INFO)  # 빈 줄 추가
+                # 원본 날짜 (실제 프로덕트 출고일)
+                original_pickup = sorted_items[0].pickup_at
+                pickup_date_str = original_pickup.strftime('%Y-%m-%d')
+                
+                # 표시용 날짜 (하루 더하기)
+                display_pickup = original_pickup + timedelta(days=1)
+                header_date = display_pickup.strftime('%m/%d')
+                
+                admin_url = f"https://admin.swatchon.me/purchase_products/receive_index?q%5Bpickup_at_gteq%5D={pickup_date_str}&q%5Bpickup_at_lteq%5D={pickup_date_str}"
+                
+                self.log(f"\n:clipboard: {admin_url}", LOG_INFO)
+                self.log(f"[{header_date} 전체 입고 예정: {total_product_count} PD / {total_unique_qualities} QL]", LOG_INFO)
+                self.log(f"[{header_date} 50yd 이상 입고 예정: {large_product_count} PD / {large_unique_qualities} QL]", LOG_INFO)
+                self.log("", LOG_INFO)  # 빈 줄
+                self.log("스와치 보관함 (스와치 제공 여부) - QL (컬러 순서) - 발주번호 - 주문번호 - 판매자 - 수량", LOG_INFO)
+                self.log("", LOG_INFO)  # 빈 줄
             
             # 50야드 이상 항목은 모두 표시
             for idx, item in enumerate(sorted_items, 1):
@@ -229,7 +244,7 @@ class ShipmentRequestSection(BaseSection):
                 self.log(log_message, LOG_INFO)
             
             # 고유한 quality_code 개수 계산 (보관함 있는 항목 기준)
-            self.log(f"\n컬러 검수를 위해 총 {unique_qualities} 퀄리티의 스와치를 준비해주시기 바랍니다~!", LOG_INFO)
+            self.log(f"\n컬러 검수를 위해 총 {large_unique_qualities} QL의 스와치를 준비해주시기 바랍니다~!", LOG_INFO)
             
             # 판매자별 메시지 미리보기는 3개만 표시
             store_messages = preview_data.get("store_messages", [])
@@ -247,6 +262,23 @@ class ShipmentRequestSection(BaseSection):
                     self.log(f"\n... 외 {len(store_messages) - 3}개 판매자 메시지 생략됨", LOG_INFO)
                 
                 self.log("\n=== 미리보기 완료 ===", LOG_INFO)
+        else:
+            # 50야드 이상이 없어도 전체 정보는 표시
+            if self._selected_items:
+                from datetime import timedelta
+                # 원본 날짜 (실제 프로덕트 출고일)
+                original_pickup = self._selected_items[0].pickup_at
+                pickup_date_str = original_pickup.strftime('%Y-%m-%d')
+                
+                # 표시용 날짜 (하루 더하기)
+                display_pickup = original_pickup + timedelta(days=1)
+                header_date = display_pickup.strftime('%m/%d')
+                
+                admin_url = f"https://admin.swatchon.me/purchase_products/receive_index?q%5Bpickup_at_gteq%5D={pickup_date_str}&q%5Bpickup_at_lteq%5D={pickup_date_str}"
+                
+                self.log(f"\n:clipboard: {admin_url}", LOG_INFO)
+                self.log(f"[{header_date} 전체 입고 예정: {total_product_count} PD / {total_unique_qualities} QL]", LOG_INFO)
+                self.log("[50yd 이상 PD 없음]", LOG_INFO)
     
     def _on_message_sent(self, result: Dict[str, Any]):
         """메시지 전송 완료 이벤트"""
@@ -440,8 +472,8 @@ class ShipmentRequestSection(BaseSection):
                     from datetime import timedelta
                     first_pickup = sorted_items[0].pickup_at + timedelta(days=1)
                     header_date = first_pickup.strftime('%m/%d')
-                    html.append(f"<h2 style='color:#000;'>[{header_date}] 50yd 이상 입고 예정: {product_count} 프로덕트 / {unique_qualities} 퀄리티</h2>")
-                    html.append("<p style='color:#000;'>스와치 보관함 (스와치 제공 여부) - 퀄리티 (컬러 순서) - 발주번호 - 판매자 - 수량</p>")
+                    html.append(f"<h2 style='color:#000;'>[{header_date}] 50yd 이상 입고 예정: {product_count} PD / {unique_qualities} QL</h2>")
+                    html.append("<p style='color:#000;'>스와치 보관함 (스와치 제공 여부) - QL (컬러 순서) - 발주번호 - 판매자 - 수량</p>")
                     html.append("<br>")
                 for idx, item in enumerate(sorted_items, 1):
                     storage_display = str(item.swatch_storage) if item.swatch_storage else "None"

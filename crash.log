@@ -331,3 +331,93 @@ Traceback (most recent call last):
 IndentationError: expected an indented block after 'if' statement on line 97
 
 ===================
+
+=== 전역 예외 발생 ===
+시간: 2025-06-26 14:25:25
+타입: <class 'ImportError'>
+값: cannot import name 'QUrl' from 'PySide6.QtGui' (D:\dev\swatchon_chat\venv\Lib\site-packages\PySide6\QtGui.pyd)
+Traceback (most recent call last):
+  File "D:\dev\swatchon_chat\main.py", line 42, in <module>
+    from ui.main_window import MainWindow
+  File "D:\dev\swatchon_chat\ui\__init__.py", line 4, in <module>
+    from ui.main_window import MainWindow
+  File "D:\dev\swatchon_chat\ui\main_window.py", line 22, in <module>
+    from ui.sections.fbo.fbo_po_section import FboPoSection
+  File "D:\dev\swatchon_chat\ui\sections\fbo\__init__.py", line 6, in <module>
+    from ui.sections.fbo.fbo_po_section import FboPoSection
+  File "D:\dev\swatchon_chat\ui\sections\fbo\fbo_po_section.py", line 14, in <module>
+    from ui.components.fbo_po_table import FboPoTable
+  File "D:\dev\swatchon_chat\ui\components\fbo_po_table.py", line 9, in <module>
+    from PySide6.QtGui import QColor, QFont, QIcon, QDesktopServices, QUrl
+ImportError: cannot import name 'QUrl' from 'PySide6.QtGui' (D:\dev\swatchon_chat\venv\Lib\site-packages\PySide6\QtGui.pyd)
+
+===================
+
+=== 전역 예외 발생 ===
+시간: 2025-06-26 14:26:33
+타입: <class 'ImportError'>
+값: cannot import name 'QUrl' from 'PySide6.QtGui' (D:\dev\swatchon_chat\venv\Lib\site-packages\PySide6\QtGui.pyd)
+Traceback (most recent call last):
+  File "D:\dev\swatchon_chat\main.py", line 42, in <module>
+    from ui.main_window import MainWindow
+  File "D:\dev\swatchon_chat\ui\__init__.py", line 4, in <module>
+    from ui.main_window import MainWindow
+  File "D:\dev\swatchon_chat\ui\main_window.py", line 22, in <module>
+    from ui.sections.fbo.fbo_po_section import FboPoSection
+  File "D:\dev\swatchon_chat\ui\sections\fbo\__init__.py", line 6, in <module>
+    from ui.sections.fbo.fbo_po_section import FboPoSection
+  File "D:\dev\swatchon_chat\ui\sections\fbo\fbo_po_section.py", line 14, in <module>
+    from ui.components.fbo_po_table import FboPoTable
+  File "D:\dev\swatchon_chat\ui\components\fbo_po_table.py", line 9, in <module>
+    from PySide6.QtGui import QColor, QFont, QIcon, QDesktopServices, QUrl
+ImportError: cannot import name 'QUrl' from 'PySide6.QtGui' (D:\dev\swatchon_chat\venv\Lib\site-packages\PySide6\QtGui.pyd)
+
+===================
+[_send_text_windows] 클립보드 복사 실패: 'mbcs' codec can't encode characters in position 0--1: invalid character
+[_send_text_windows] 클립보드 복사 실패: 'mbcs' codec can't encode characters in position 0--1: invalid character
+[_send_text_windows] 클립보드 복사 실패: 'mbcs' codec can't encode characters in position 0--1: invalid character
+
+=== 전역 예외 발생 ===
+시간: 2025-06-27 13:01:40
+타입: <class 'AttributeError'>
+값: 'ShipmentRequestTable' object has no attribute 'update_selection_count'
+Traceback (most recent call last):
+  File "D:\dev\swatchon_chat\ui\components\table.py", line 225, in _on_header_section_clicked
+    self._emit_selection_changed(is_bulk_update=True)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+  File "D:\dev\swatchon_chat\ui\components\shipment_request_table.py", line 452, in _emit_selection_changed
+    self.update_selection_count(selected_count)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ShipmentRequestTable' object has no attribute 'update_selection_count'. Did you mean: '_update_selection_label'?
+
+===================
+
+=== 전역 예외 발생 ===
+시간: 2025-06-27 13:01:57
+타입: <class 'AttributeError'>
+값: 'ShipmentRequestTable' object has no attribute 'update_selection_count'
+Traceback (most recent call last):
+  File "D:\dev\swatchon_chat\ui\components\table.py", line 225, in _on_header_section_clicked
+    self._emit_selection_changed(is_bulk_update=True)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+  File "D:\dev\swatchon_chat\ui\components\shipment_request_table.py", line 452, in _emit_selection_changed
+    self.update_selection_count(selected_count)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ShipmentRequestTable' object has no attribute 'update_selection_count'. Did you mean: '_update_selection_label'?
+
+===================
+
+=== 전역 예외 발생 ===
+시간: 2025-06-27 13:02:00
+타입: <class 'AttributeError'>
+값: 'ShipmentRequestTable' object has no attribute 'update_selection_count'
+Traceback (most recent call last):
+  File "D:\dev\swatchon_chat\ui\components\table.py", line 225, in _on_header_section_clicked
+    self._emit_selection_changed(is_bulk_update=True)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+  File "D:\dev\swatchon_chat\ui\components\shipment_request_table.py", line 452, in _emit_selection_changed
+    self.update_selection_count(selected_count)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ShipmentRequestTable' object has no attribute 'update_selection_count'. Did you mean: '_update_selection_label'?
+
+===================

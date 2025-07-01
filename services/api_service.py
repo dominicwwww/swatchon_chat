@@ -115,6 +115,57 @@ class ApiService:
         """
         return self._make_request(API_ENDPOINTS["pickup_requests"])
     
+    def get_purchase_confirms(self) -> Optional[List[Dict[str, Any]]]:
+        """
+        FBO 발주 확인 목록 가져오기 (모든 페이지)
+        
+        Returns:
+            Optional[List[Dict[str, Any]]]: 발주 확인 목록 (실패 시 None)
+        """
+        try:
+            all_items = []
+            page = 1
+            
+            while True:
+                self.logger.info(f"발주 확인 API 페이지 {page} 요청 중...")
+                
+                # 페이지 파라미터와 함께 요청
+                params = {"page": page}
+                data = self._make_request(API_ENDPOINTS["purchase_confirms"], params=params)
+                
+                if not data:
+                    self.logger.warning(f"페이지 {page}에서 데이터를 받지 못했습니다.")
+                    break
+                
+                # 응답이 리스트인지 딕셔너리인지 확인
+                if isinstance(data, list):
+                    items = data
+                elif isinstance(data, dict) and 'items' in data:
+                    items = data['items']
+                else:
+                    items = data if data else []
+                
+                if not items:
+                    self.logger.info(f"페이지 {page}에 더 이상 데이터가 없습니다.")
+                    break
+                
+                all_items.extend(items)
+                self.logger.info(f"페이지 {page}: {len(items)}개 항목 추가 (총 {len(all_items)}개)")
+                
+                # 25개 미만이면 마지막 페이지
+                if len(items) < 25:
+                    self.logger.info(f"마지막 페이지 {page} 처리 완료")
+                    break
+                
+                page += 1
+            
+            self.logger.info(f"전체 {len(all_items)}개 발주 확인 항목 로드 완료")
+            return all_items
+            
+        except Exception as e:
+            self.logger.error(f"발주 확인 목록 가져오기 실패: {str(e)}")
+            return None
+    
     @staticmethod
     def get_purchase_products_old() -> Optional[PurchaseProductList]:
         """구매 상품 전체 목록 조회 (모든 페이지 반복)"""

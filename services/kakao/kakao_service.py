@@ -232,7 +232,8 @@ class KakaoService:
             try:
                 win32clipboard.OpenClipboard()
                 win32clipboard.EmptyClipboard()
-                win32clipboard.SetClipboardText(text)
+                # UTF-16 인코딩으로 한글 텍스트 처리
+                win32clipboard.SetClipboardData(win32con.CF_UNICODETEXT, text)
                 win32clipboard.CloseClipboard()
             except Exception as e:
                 self.logger.error(f"클립보드 복사 실패: {str(e)}")

@@ -3,18 +3,19 @@
 """
 from PySide6.QtWidgets import (
     QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
-    QFrame, QTableWidget, QTableWidgetItem, QFileDialog
+    QFrame, QTableWidget, QTableWidgetItem, QFileDialog, QTabWidget
 )
 from PySide6.QtCore import Qt, QThread, Signal
 from core.types import SectionType
-# from reference.maintenance_fee_handler import MaintenanceFeeHandler  # 삭제
 from services.maintenance_handler import MaintenanceHandler
 from core.config import ConfigManager
 from ui.sections.base_section import BaseSection
 from ui.components.log_widget import LOG_INFO, LOG_WARNING, LOG_ERROR, LOG_SUCCESS
+from ui.components.maintenance_fee_table import MaintenanceFeeTable
 import os
 import re
 import json
+import glob
 from datetime import datetime
 from bs4 import BeautifulSoup
 
@@ -82,10 +83,9 @@ def extract_info(html_content):
         return None
 
 class MaintenanceFeeSection(BaseSection):
-    """관리비 정산 섹션 (파일 임포트, 테이블, 자동화, 한 건씩 진행)"""
+    """관리비 정산 섹션 (파일 임포트, 테이블, 자동화, 한 건씩 진행, 월별 탭)"""
     def __init__(self, parent=None):
         super().__init__("관리비 정산", parent)
-        # self.fee_handler = MaintenanceFeeHandler()  # 삭제
         self.config_manager = ConfigManager()
         self.maintenance_handler = MaintenanceHandler(self.config_manager)
         self.files_data = []  # (file_path, unit_number, total_amount, supply_amount, vat_amount, year, month)
@@ -96,28 +96,45 @@ class MaintenanceFeeSection(BaseSection):
         self.data_dir = os.path.join('data', 'maintenance_fee')
         os.makedirs(self.data_dir, exist_ok=True)
         
+        # 월별 데이터 저장
+        self.monthly_data = {}  # 월별 데이터 저장 {year_month: data}
+        
         self._init_ui()
+        self._load_existing_data()  # 기존 데이터 로드
 
     def on_section_activated(self):
         """섹션이 활성화될 때 호출되는 메서드"""
         self.log("관리비 정산 섹션이 활성화되었습니다.", LOG_INFO)
-        # 필요한 초기화 작업이 있다면 여기에 추가
 
     def _init_ui(self):
+        # 탭 위젯 생성
+        self.tab_widget = QTabWidget()
+        self.content_layout.addWidget(self.tab_widget)
+        
+        # 신규 데이터 탭
+        self._create_new_data_tab()
+        
+        # 기존 데이터 탭들은 _load_existing_data에서 생성
+
+    def _create_new_data_tab(self):
+        """신규 데이터 입력 탭 생성"""
+        new_tab = QFrame()
+        new_layout = QVBoxLayout(new_tab)
+        
         # 상단: 파일 선택 버튼
         top_layout = QHBoxLayout()
         self.file_button = QPushButton("정산서(HTML) 파일 선택")
         self.file_button.clicked.connect(self.select_files)
         top_layout.addWidget(self.file_button)
         top_layout.addStretch()
-        self.content_layout.addLayout(top_layout)
+        new_layout.addLayout(top_layout)
 
         # 테이블
         self.table = QTableWidget()
         self.table.setColumnCount(7)
         self.table.setHorizontalHeaderLabels(["파일명", "호수", "공급가액", "부가세", "합계", "연월", "상태"])
         self.table.horizontalHeader().setStretchLastSection(True)
-        self.content_layout.addWidget(self.table)
+        new_layout.addWidget(self.table)
 
         # 정산서 작성 버튼
         btn_layout = QHBoxLayout()
@@ -125,7 +142,94 @@ class MaintenanceFeeSection(BaseSection):
         self.process_button.clicked.connect(self.process_next_maintenance)
         btn_layout.addStretch()
         btn_layout.addWidget(self.process_button)
-        self.content_layout.addLayout(btn_layout)
+        new_layout.addLayout(btn_layout)
+        
+        # 탭에 추가
+        self.tab_widget.addTab(new_tab, "신규 데이터")
+
+    def _load_existing_data(self):
+        """기존 JSON 데이터 로드"""
+        try:
+            # data/maintenance_fee 디렉토리에서 JSON 파일들 찾기
+            json_files = glob.glob(os.path.join(self.data_dir, 'maintenance_fee_*.json'))
+            
+            if not json_files:
+                self.log("기존 관리비 데이터가 없습니다.", LOG_INFO)
+                return
+            
+            for json_file in json_files:
+                try:
+                    with open(json_file, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                    
+                    # 파일명에서 연월 정보 추출 (maintenance_fee_202505_250624.json)
+                    filename = os.path.basename(json_file)
+                    year_month_match = re.search(r'maintenance_fee_(\d{6})_', filename)
+                    if year_month_match:
+                        year_month = year_month_match.group(1)
+                        year = int(year_month[:4])
+                        month = int(year_month[4:])
+                        
+                        # 월별 데이터 저장
+                        month_key = f"{year:04d}{month:02d}"
+                        self.monthly_data[month_key] = data
+                        
+                        # 월별 탭 생성
+                        self._create_monthly_tab(year, month, data)
+                        
+                        self.log(f"{year}년 {month}월 관리비 데이터 로드: {len(data.get('items', []))}건", LOG_INFO)
+                    
+                except Exception as e:
+                    self.log(f"JSON 파일 로드 실패 ({json_file}): {str(e)}", LOG_ERROR)
+                    continue
+            
+        except Exception as e:
+            self.log(f"기존 데이터 로드 중 오류: {str(e)}", LOG_ERROR)
+
+    def _create_monthly_tab(self, year: int, month: int, data: dict):
+        """월별 데이터 탭 생성"""
+        tab = QFrame()
+        layout = QVBoxLayout(tab)
+        
+        # 상단 정보
+        info_layout = QHBoxLayout()
+        
+        # 기본 정보 라벨
+        total_count = data.get('total_count', 0)
+        processed_count = data.get('processed_count', 0)
+        success_count = len([item for item in data.get('items', []) if item.get('status') == '성공'])
+        failed_count = len([item for item in data.get('items', []) if item.get('status') == '실패'])
+        
+        info_label = QLabel(f"총 {total_count}건 | 처리완료 {processed_count}건 | 성공 {success_count}건 | 실패 {failed_count}건")
+        info_label.setStyleSheet("font-weight: bold; color: #2c3e50;")
+        info_layout.addWidget(info_label)
+        info_layout.addStretch()
+        
+        layout.addLayout(info_layout)
+        
+        # 테이블 생성
+        monthly_table = MaintenanceFeeTable()
+        
+        # 데이터 변환 및 설정
+        table_data = []
+        for item in data.get('items', []):
+            table_data.append({
+                'date': f"{year}-{month:02d}",
+                'unit_number': item.get('unit_number', ''),
+                'supply_amount': item.get('supply_amount', 0),
+                'vat_amount': item.get('vat_amount', 0),
+                'file_name': item.get('file_name', ''),
+                'status': item.get('status', '대기중'),
+                'processed_at': item.get('processed_at', ''),
+                'error_message': item.get('error_message', '')
+            })
+        
+        monthly_table.update_data(table_data)
+        layout.addWidget(monthly_table.main_widget)
+        
+        # 탭 제목
+        tab_title = f"{year}년 {month}월"
+        self.tab_widget.addTab(tab, tab_title)
 
     def select_files(self):
         file_paths, _ = QFileDialog.getOpenFileNames(
@@ -313,4 +417,4 @@ class MaintenanceFeeSection(BaseSection):
         
         # 워커 정리
         self.worker.deleteLater()
-        self.worker = None 
+        self.worker = None

@@ -66,9 +66,19 @@ class StatisticsCard(QFrame):
         layout.addWidget(self.title_label)
         layout.addWidget(self.value_label)
     
-    def update_value(self, value: int):
-        """값 업데이트"""
-        self.value_label.setText(str(value))
+    def update_value(self, value):
+        """값 업데이트 - 정수와 소수점 모두 지원"""
+        if isinstance(value, float):
+            # 소수점이 있는 경우
+            if value == int(value):
+                # 소수점이 0인 경우 정수로 표시
+                self.value_label.setText(str(int(value)))
+            else:
+                # 소수점 1자리로 표시
+                self.value_label.setText(f"{value:.1f}")
+        else:
+            # 정수인 경우
+            self.value_label.setText(str(value))
 
 
 class StatisticsWidget(QWidget):
@@ -79,37 +89,73 @@ class StatisticsWidget(QWidget):
     - 상태별 통계 카드 표시
     - 실시간 업데이트
     - 테마 적용
+    - 2행 레이아웃 지원
     """
     
     # 시그널 정의
     card_clicked = Signal(str)  # 카드 클릭 시그널
     
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, use_two_rows=False):
         super().__init__(parent)
         
         # 통계 카드들
         self.cards: Dict[str, StatisticsCard] = {}
+        self.use_two_rows = use_two_rows
         
         self.setup_ui()
     
     def setup_ui(self):
         """UI 설정"""
-        layout = QHBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(12)
-        
-        # 기본 통계 카드들 생성
-        self.create_card("total", "전체", "primary")
-        self.create_card("pending", "대기중", "warning")
-        self.create_card("sending", "전송중", "info")
-        self.create_card("sent", "전송완료", "success")
-        self.create_card("failed", "전송실패", "error")
-        self.create_card("cancelled", "취소됨", "secondary")
-        
-        # 신축성 있는 공간 추가
-        layout.addStretch()
+        if self.use_two_rows:
+            # 2행 레이아웃
+            main_layout = QVBoxLayout(self)
+            main_layout.setContentsMargins(0, 0, 0, 0)
+            main_layout.setSpacing(8)
+            
+            # 첫 번째 행 (메시지 관련)
+            self.first_row_widget = QWidget()
+            self.first_row_layout = QHBoxLayout(self.first_row_widget)
+            self.first_row_layout.setContentsMargins(0, 0, 0, 0)
+            self.first_row_layout.setSpacing(12)
+            
+            # 두 번째 행 (데이터 관련)
+            self.second_row_widget = QWidget()
+            self.second_row_layout = QHBoxLayout(self.second_row_widget)
+            self.second_row_layout.setContentsMargins(0, 0, 0, 0)
+            self.second_row_layout.setSpacing(12)
+            
+            main_layout.addWidget(self.first_row_widget)
+            main_layout.addWidget(self.second_row_widget)
+            
+            # 기본 통계 카드들 생성 (첫 번째 행에 메시지 관련)
+            self.create_card("total", "전체", "primary", row=1)
+            self.create_card("pending", "대기중", "warning", row=1)
+            self.create_card("sending", "전송중", "info", row=1)
+            self.create_card("sent", "전송완료", "success", row=1)
+            self.create_card("failed", "전송실패", "error", row=1)
+            self.create_card("cancelled", "취소됨", "secondary", row=1)
+            
+            # 각 행에 신축성 있는 공간 추가
+            self.first_row_layout.addStretch()
+            self.second_row_layout.addStretch()
+        else:
+            # 기존 1행 레이아웃
+            layout = QHBoxLayout(self)
+            layout.setContentsMargins(0, 0, 0, 0)
+            layout.setSpacing(12)
+            
+            # 기본 통계 카드들 생성
+            self.create_card("total", "전체", "primary")
+            self.create_card("pending", "대기중", "warning")
+            self.create_card("sending", "전송중", "info")
+            self.create_card("sent", "전송완료", "success")
+            self.create_card("failed", "전송실패", "error")
+            self.create_card("cancelled", "취소됨", "secondary")
+            
+            # 신축성 있는 공간 추가
+            layout.addStretch()
     
-    def create_card(self, key: str, title: str, color: str):
+    def create_card(self, key: str, title: str, color: str, row: int = 1):
         """통계 카드 생성"""
         card = StatisticsCard(title, 0, color)
         self.cards[key] = card
@@ -117,7 +163,13 @@ class StatisticsWidget(QWidget):
         # 클릭 이벤트 처리
         card.mousePressEvent = lambda event, k=key: self._on_card_clicked(k)
         
-        self.layout().addWidget(card)
+        if self.use_two_rows:
+            if row == 1:
+                self.first_row_layout.insertWidget(self.first_row_layout.count() - 1, card)
+            else:
+                self.second_row_layout.insertWidget(self.second_row_layout.count() - 1, card)
+        else:
+            self.layout().addWidget(card)
     
     def _on_card_clicked(self, key: str):
         """카드 클릭 이벤트"""
@@ -134,13 +186,13 @@ class StatisticsWidget(QWidget):
             if key in self.cards:
                 self.cards[key].update_value(value)
     
-    def update_single_statistic(self, key: str, value: int):
+    def update_single_statistic(self, key: str, value):
         """
         개별 통계 업데이트
         
         Args:
             key: 통계 키
-            value: 값
+            value: 값 (int 또는 float)
         """
         if key in self.cards:
             self.cards[key].update_value(value)
@@ -170,7 +222,7 @@ class StatisticsWidget(QWidget):
         if key in self.cards:
             self.cards[key].setVisible(visible)
     
-    def add_custom_card(self, key: str, title: str, color: str = "primary", value: int = 0):
+    def add_custom_card(self, key: str, title: str, color: str = "primary", value: int = 0, row: int = 2):
         """
         사용자 정의 카드 추가
         
@@ -179,6 +231,7 @@ class StatisticsWidget(QWidget):
             title: 카드 제목
             color: 카드 색상
             value: 초기 값
+            row: 행 번호 (1: 첫 번째 행, 2: 두 번째 행) - 2행 레이아웃에서만 적용
         """
         if key not in self.cards:
             card = StatisticsCard(title, value, color)
@@ -187,9 +240,16 @@ class StatisticsWidget(QWidget):
             # 클릭 이벤트 처리
             card.mousePressEvent = lambda event, k=key: self._on_card_clicked(k)
             
-            # stretch 위젯 앞에 삽입
-            layout = self.layout()
-            layout.insertWidget(layout.count() - 1, card)
+            if self.use_two_rows:
+                # 2행 레이아웃에서는 row 매개변수에 따라 배치
+                if row == 1:
+                    self.first_row_layout.insertWidget(self.first_row_layout.count() - 1, card)
+                else:
+                    self.second_row_layout.insertWidget(self.second_row_layout.count() - 1, card)
+            else:
+                # 1행 레이아웃에서는 stretch 위젯 앞에 삽입
+                layout = self.layout()
+                layout.insertWidget(layout.count() - 1, card)
     
     def remove_card(self, key: str):
         """

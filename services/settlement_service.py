@@ -59,7 +59,19 @@ class SettlementService:
             
             print(f"정산서 페이지로 이동: {settlement_url}")
             self.driver.get(settlement_url)
-            time.sleep(2)  # 페이지 로드 대기
+            time.sleep(3)  # 페이지 로드 대기 시간 증가
+            
+            # 페이지가 완전히 로드될 때까지 대기
+            try:
+                WebDriverWait(self.driver, 10).until(
+                    EC.presence_of_element_located((By.ID, "settlement_bank_account_id"))
+                )
+                print("페이지 로딩 완료 확인됨")
+            except Exception as e:
+                print(f"페이지 로딩 대기 중 오류: {e}")
+                # 페이지 소스 일부 출력하여 디버깅
+                print("현재 페이지 제목:", self.driver.title)
+                print("현재 URL:", self.driver.current_url)
 
             print("계좌 선택 중...")
             # 계좌 선택 (첫 번째 실제 계좌 선택 - 빈 값이 아닌 첫 번째 옵션)
@@ -84,11 +96,25 @@ class SettlementService:
             time.sleep(1)  # 입력 완료 대기
 
             print("파일 첨부 중...")
-            # 파일 첨부
+            # 파일 첨부 - input[type='file'] 선택자 사용 (확인된 작동 선택자)
             file_path = os.path.abspath(data[0])
-            file_input = self.driver.find_element(By.ID, "Settlement-file-input")
-            file_input.send_keys(file_path)
-            time.sleep(2)  # 파일 업로드 대기
+            
+            try:
+                # 작동하는 것으로 확인된 선택자 직접 사용
+                WebDriverWait(self.driver, 10).until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='file']"))
+                )
+                file_input = self.driver.find_element(By.CSS_SELECTOR, "input[type='file']")
+                print("파일 입력 요소 찾음")
+                
+                # 파일 업로드
+                file_input.send_keys(file_path)
+                print(f"파일 업로드 시작: {file_path}")
+                time.sleep(3)  # 파일 업로드 대기
+                
+            except Exception as e:
+                print(f"파일 첨부 중 오류: {str(e)}")
+                raise Exception(f"파일 첨부 실패: {str(e)}")
 
             print("파일 업로드 완료 대기 중...")
             # S3 업로드 완료 대기 (프로그레스바가 사라질 때까지)

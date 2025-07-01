@@ -1,44 +1,15 @@
 """
-FBO 발주 확인 테이블 컴포넌트 - 계층형 구조 지원
+FBO 발주 확인 테이블 컴포넌트 - 평면 구조 지원
 """
 from typing import List, Dict, Any, Optional
 from PySide6.QtWidgets import (
-    QCheckBox, QLabel, QHBoxLayout, QWidget, QTableWidgetItem, QPushButton
+    QCheckBox, QLabel, QHBoxLayout, QWidget, QTableWidgetItem, QPushButton, QHeaderView
 )
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor, QFont, QIcon
 from ui.components.table import BaseTable
-
-class HierarchicalTableItem(QTableWidgetItem):
-    """계층형 테이블 아이템"""
-    def __init__(self, text: str, level: int = 0, item_type: str = "purchase", expandable: bool = False):
-        super().__init__(text)
-        self.level = level
-        self.item_type = item_type  # "purchase" 또는 "product"
-        self.expandable = expandable
-        self.expanded = False
-        self.parent_purchase_code = None
-        self.product_data = None
-        
-        # 스타일 적용
-        self._apply_style()
-    
-    def _apply_style(self):
-        """아이템 스타일 적용"""
-        font = QFont()
-        
-        if self.item_type == "purchase":
-            # 발주 행 스타일
-            font.setBold(True)
-            self.setFont(font)
-            if self.expandable:
-                # 확장 가능한 경우 배경색 변경
-                self.setBackground(QColor(240, 248, 255))  # 연한 파란색
-        else:
-            # 프로덕트 행 스타일
-            font.setBold(False)
-            self.setFont(font)
-            self.setBackground(QColor(248, 250, 252))  # 연한 회색
+from ui.theme import get_theme
+from core.constants import TABLE_COLUMN_NAMES, MESSAGE_STATUS_LABELS
 
 class FboPoTable(BaseTable):
     selection_changed = Signal(list)  # 선택된 항목 변경 시그널
@@ -47,91 +18,72 @@ class FboPoTable(BaseTable):
     def __init__(self, parent=None, log_function=None):
         super().__init__(parent, log_function=log_function)
         
-        # 기본 발주 테이블 컬럼
-        self.purchase_columns = [
-            "선택", "발주번호", "거래타입", "생성시각", "주문", "판매자", 
-            "발주담당자", "발주수량", "공급가액", "단가변경여부", "지연허용여부", 
-            "상태", "정산상태", "내부메모"
+        # JSON 필드명 순서 (실제 데이터 순서)
+        self.field_names = [
+            "id", "store_name", "quality_code", "quality_name", "swatch_pickupable", 
+            "swatch_storage", "color_number", "color_code", "quantity", "order_code", 
+            "purchase_code", "last_pickup_at", "status", "message_status", "processed_at", 
+            "price", "unit_price", "unit_price_origin", "additional_info", "created_at", "updated_at"
         ]
         
-        # 프로덕트 확장 시 추가 컬럼 (필요한 것만 선택)
-        self.product_columns = [
-            "", "제품ID", "판매방식", "퀄리티", "컬러", "프로덕트코드", 
-            "수량", "금액", "단가", "상태", "", "", "", ""
-        ]
+        # 컬럼 헤더 (한글명)
+        self.column_headers = ["선택"] + [TABLE_COLUMN_NAMES.get(field, field) for field in self.field_names]
         
-        self.setup_columns(self.purchase_columns)
+        # 필드 타입 정의 (포맷팅용)
+        self.field_types = {
+            "id": "text",
+            "store_name": "text", 
+            "quality_code": "text",
+            "quality_name": "text",
+            "swatch_pickupable": "boolean",
+            "swatch_storage": "text",
+            "color_number": "text",
+            "color_code": "text",
+            "quantity": "text",
+            "order_code": "text",
+            "purchase_code": "text",
+            "last_pickup_at": "datetime",
+            "status": "text",
+            "message_status": "text",
+            "processed_at": "datetime",
+            "price": "price",
+            "unit_price": "price", 
+            "unit_price_origin": "price",
+            "additional_info": "text",
+            "created_at": "datetime",
+            "updated_at": "datetime"
+        }
+        
+        # 혼합 모드로 컬럼 설정 (선택 컬럼은 고정, 나머지는 내용에 맞게)
+        self.setup_columns(self.column_headers, resize_mode="mixed")
+        
+        # 숫자 정렬이 필요한 컬럼들 설정
+        numeric_column_names = ["수량(yd)", "총가격", "단가", "원본단가"]
+        self.set_numeric_columns_by_names(numeric_column_names)
+        
         self.setSelectionBehavior(BaseTable.SelectRows)
         self.setSelectionMode(BaseTable.SingleSelection)
         self.setEditTriggers(BaseTable.NoEditTriggers)
-        self.setSortingEnabled(False)  # 계층 구조에서는 정렬 비활성화
-        self._is_bulk_update = False
+        self.setSortingEnabled(True)  # 정렬 기능 활성화
+        self.apply_alternating_row_colors(True)
         
-        # 데이터 저장소
-        self.hierarchical_data = []  # 계층형 데이터
-        self.expanded_purchases = set()  # 확장된 발주번호들
-        
-        self.selection_label = QLabel("선택된 항목: 0개")
-        self.selection_label.setStyleSheet("""
-            QLabel {
-                color: #007bff;
-                font-weight: bold;
-                padding: 4px 8px;
-                background-color: #e3f2fd;
-                border-radius: 4px;
-                border: 1px solid #bbdefb;
-            }
-        """)
+        # 추가 컬럼 너비 조정 (선택적)
+        header = self.horizontalHeader()
+        # ID 컬럼을 좀 더 좁게
+        if len(self.column_headers) > 1:
+            header.resizeSection(1, 80)  # ID 컬럼
 
     def update_data(self, data: List[Dict[str, Any]]):
-        """
-        데이터 업데이트 - 계층형 구조로 변환
-        
-        Args:
-            data: 발주 목록 데이터
-        """
+        """테이블 데이터 업데이트"""
         self.clear_table()
-        self.hierarchical_data = []
-        
-        for purchase_data in data:
-            # 발주 행 추가
-            purchase_row = {
-                "type": "purchase",
-                "level": 0,
-                "data": purchase_data,
-                "is_expandable": True,
-                "is_expanded": False,
-                "products": []  # 나중에 로드
-            }
-            self.hierarchical_data.append(purchase_row)
-        
-        self._refresh_table_display()
-
-    def _refresh_table_display(self):
-        """테이블 표시 새로고침"""
-        self.clear_table()
-        
-        for row_data in self.hierarchical_data:
-            if row_data["type"] == "purchase":
-                self._add_purchase_row(row_data)
-                
-                # 확장된 상태이고 프로덕트가 있으면 프로덕트 행들도 추가
-                purchase_code = row_data["data"].get("발주번호", "")
-                if (row_data["is_expanded"] and 
-                    purchase_code in self.expanded_purchases and 
-                    row_data["products"]):
-                    
-                    for product_data in row_data["products"]:
-                        self._add_product_row(product_data, purchase_code)
-        
+        for row_data in data:
+            self._add_row(row_data)
         self._update_selection_label()
 
-    def _add_purchase_row(self, purchase_row_data: Dict[str, Any]):
-        """발주 행 추가"""
+    def _add_row(self, row_data: Dict[str, Any]):
+        """행 추가 (개선된 포맷팅 포함)"""
         row_index = self.rowCount()
         self.insertRow(row_index)
-        
-        purchase_data = purchase_row_data["data"]
         
         # 체크박스 추가
         checkbox = QCheckBox()
@@ -140,140 +92,54 @@ class FboPoTable(BaseTable):
         checkbox.stateChanged.connect(self._on_any_checkbox_changed)
         self.setCellWidget(row_index, 0, self._create_checkbox_widget(checkbox))
         
-        # 발주번호에 확장/축소 버튼 추가
-        purchase_code = purchase_data.get("발주번호", "")
-        expand_widget = self._create_expand_widget(purchase_code, purchase_row_data["is_expanded"])
-        self.setCellWidget(row_index, 1, expand_widget)
-        
-        # 나머지 컬럼 데이터 추가
-        data_columns = [
-            "거래타입", "생성시각", "주문", "판매자", 
-            "발주담당자", "발주수량", "공급가액", "단가변경여부", "지연허용여부", 
-            "상태", "정산상태", "내부메모"
-        ]
-        
-        for col, column_key in enumerate(data_columns, start=2):
-            if col < self.columnCount():
-                value = purchase_data.get(column_key, "")
-                item = HierarchicalTableItem(
-                    str(value) if value is not None else "", 
-                    level=0, 
-                    item_type="purchase", 
-                    expandable=True
-                )
+        # 데이터 컬럼 추가 (포맷팅 포함)
+        for col, field_name in enumerate(self.field_names, start=1):
+            raw_value = row_data.get(field_name)
+            field_type = self.field_types.get(field_name, "text")
+            
+            # BaseTable의 공통 포맷팅 사용
+            formatted_value, is_empty = self.format_cell_value(raw_value, field_type)
+            
+            # 메시지 상태는 별도 처리 (빈 값이 아닌 경우만)
+            if field_name == "message_status" and not is_empty:
+                formatted_value = MESSAGE_STATUS_LABELS.get(str(raw_value), str(raw_value))
+            
+            # 스와치픽업 필드는 공통 불린 처리 사용
+            if field_name == "swatch_pickupable":
+                # BaseTable의 공통 불린 아이템 생성 메서드 사용
+                item = self.create_boolean_table_item(raw_value, field_name)
                 self.setItem(row_index, col, item)
-
-    def _create_expand_widget(self, purchase_code: str, is_expanded: bool) -> QWidget:
-        """확장/축소 위젯 생성"""
-        widget = QWidget()
-        layout = QHBoxLayout(widget)
-        layout.setContentsMargins(2, 0, 2, 0)
-        
-        # 확장/축소 버튼
-        expand_btn = QPushButton("▼" if is_expanded else "▶")
-        expand_btn.setFixedSize(20, 20)
-        expand_btn.setProperty("purchase_code", purchase_code)
-        expand_btn.clicked.connect(self._on_expand_clicked)
-        expand_btn.setStyleSheet("""
-            QPushButton {
-                border: none;
-                background: transparent;
-                font-weight: bold;
-                color: #666;
-            }
-            QPushButton:hover {
-                color: #007bff;
-            }
-        """)
-        
-        # 발주번호 라벨
-        code_label = QLabel(purchase_code)
-        code_label.setStyleSheet("font-weight: bold; color: #007bff;")
-        
-        layout.addWidget(expand_btn)
-        layout.addWidget(code_label)
-        layout.addStretch()
-        
-        return widget
-
-    def _add_product_row(self, product_data: Dict[str, Any], parent_purchase_code: str):
-        """프로덕트 행 추가"""
-        row_index = self.rowCount()
-        self.insertRow(row_index)
-        
-        # 첫 번째 컬럼은 들여쓰기 표시
-        indent_widget = QWidget()
-        indent_layout = QHBoxLayout(indent_widget)
-        indent_layout.setContentsMargins(30, 0, 0, 0)  # 30px 들여쓰기
-        indent_label = QLabel("└")
-        indent_label.setStyleSheet("color: #ccc;")
-        indent_layout.addWidget(indent_label)
-        indent_layout.addStretch()
-        self.setCellWidget(row_index, 0, indent_widget)
-        
-        # 프로덕트 데이터 매핑
-        product_display_data = [
-            product_data.get("product_id", ""),
-            product_data.get("sale_type", ""),
-            product_data.get("quality_name", ""),
-            f"{product_data.get('color_name', '')} ({product_data.get('color_code', '')})",
-            product_data.get("product_code", ""),
-            product_data.get("quantity", ""),
-            f"{int(product_data.get('total_price', 0)):,}" if product_data.get('total_price', '').isdigit() else product_data.get('total_price', ''),
-            f"{int(product_data.get('unit_price', 0)):,}" if product_data.get('unit_price', '').isdigit() else product_data.get('unit_price', ''),
-            product_data.get("status", ""),
-            "", "", "", ""  # 빈 컬럼들
-        ]
-        
-        for col, value in enumerate(product_display_data, start=1):
-            if col < self.columnCount():
-                item = HierarchicalTableItem(
-                    str(value) if value is not None else "", 
-                    level=1, 
-                    item_type="product"
-                )
-                item.parent_purchase_code = parent_purchase_code
-                item.product_data = product_data
+            else:
+                # 적절한 테이블 아이템 생성 (숫자 컬럼 고려)
+                item = self._create_table_item(formatted_value, col, raw_value)
                 self.setItem(row_index, col, item)
+                
+                # 빈 값인 경우 빨간색 X 표시
+                if is_empty:
+                    self.set_cell_empty_style(row_index, col)
+            
+            # 하이퍼링크 설정
+            self._set_hyperlink_if_needed(row_index, col, field_name, row_data)
 
-    def _on_expand_clicked(self):
-        """확장/축소 버튼 클릭 처리"""
-        button = self.sender()
-        purchase_code = button.property("purchase_code")
+    def _set_hyperlink_if_needed(self, row: int, col: int, field_name: str, row_data: Dict[str, Any]):
+        """필요한 경우 하이퍼링크 설정"""
+        url = None
         
-        if purchase_code in self.expanded_purchases:
-            # 축소
-            self.expanded_purchases.remove(purchase_code)
-            self._update_purchase_expanded_state(purchase_code, False)
-        else:
-            # 확장 - JSON 데이터에서 프로덕트 로드 요청
-            self.expanded_purchases.add(purchase_code)
-            self._update_purchase_expanded_state(purchase_code, True)
-            self.product_show_requested.emit(purchase_code)
-
-    def _update_purchase_expanded_state(self, purchase_code: str, expanded: bool):
-        """발주의 확장 상태 업데이트"""
-        for row_data in self.hierarchical_data:
-            if (row_data["type"] == "purchase" and 
-                row_data["data"].get("발주번호") == purchase_code):
-                row_data["is_expanded"] = expanded
-                break
+        if field_name == "purchase_code" and row_data.get("purchase_url"):
+            url = row_data["purchase_url"]
+        elif field_name == "order_code" and row_data.get("order_url"):
+            url = row_data["order_url"]
+        elif field_name == "store_name" and row_data.get("store_url"):
+            url = row_data["store_url"]
+        elif field_name == "quality_name" and row_data.get("quality_url"):
+            url = row_data["quality_url"]
         
-        self._refresh_table_display()
-
-    def add_products_to_purchase(self, purchase_code: str, products: List[Dict[str, Any]]):
-        """발주에 프로덕트 데이터 추가"""
-        for row_data in self.hierarchical_data:
-            if (row_data["type"] == "purchase" and 
-                row_data["data"].get("발주번호") == purchase_code):
-                row_data["products"] = products
-                break
-        
-        # 확장된 상태면 테이블 새로고침
-        if purchase_code in self.expanded_purchases:
-            self._refresh_table_display()
+        if url:
+            # 하이퍼링크 스타일과 함께 설정 (밑줄, 색상, 툴팁)
+            self.set_cell_link(row, col, url, show_link_style=True)
 
     def _create_checkbox_widget(self, checkbox):
+        """체크박스 위젯 생성"""
         widget = QWidget()
         layout = QHBoxLayout(widget)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -282,91 +148,71 @@ class FboPoTable(BaseTable):
         return widget
 
     def _on_any_checkbox_changed(self, state: int):
+        """체크박스 상태 변경 처리"""
         if not getattr(self, '_is_bulk_update', False):
             self._emit_selection_changed()
 
     def _emit_selection_changed(self, is_bulk_update: bool = False):
+        """선택 변경 시그널 발생"""
         selected_items = []
         for row in range(self.rowCount()):
             checkbox_widget = self.cellWidget(row, 0)
             if checkbox_widget:
                 checkbox = checkbox_widget.findChild(QCheckBox)
                 if checkbox and checkbox.isChecked():
-                    # 발주 행만 선택 가능 (프로덕트 행은 제외)
-                    row_type = checkbox.property("row_type")
-                    if row_type == "purchase":
-                        item_data = {}
-                        for col in range(1, self.columnCount()):
-                            header = self.horizontalHeaderItem(col)
-                            key = header.text() if header else str(col)
-                            
-                            if col == 1:  # 발주번호 컬럼
-                                # 위젯에서 발주번호 추출
-                                widget = self.cellWidget(row, col)
-                                if widget:
-                                    label = widget.findChild(QLabel)
-                                    if label:
-                                        item_data[key] = label.text()
-                            else:
-                                cell_item = self.item(row, col)
-                                item_data[key] = cell_item.text() if cell_item else ""
-                        selected_items.append(item_data)
+                    item_data = {}
+                    for col in range(1, self.columnCount()):
+                        # 영문 필드명을 사용 (col-1 인덱스로 field_names 접근)
+                        field_name = self.field_names[col-1] if col-1 < len(self.field_names) else str(col)
+                        cell_item = self.item(row, col)
+                        item_data[field_name] = cell_item.text() if cell_item else ""
+                    selected_items.append(item_data)
         
         self._update_selection_label()
         self.selection_changed.emit(selected_items)
 
     def _update_selection_label(self):
+        """선택된 항목 수 라벨 업데이트"""
         selected_count = 0
         for row in range(self.rowCount()):
             checkbox_widget = self.cellWidget(row, 0)
             if checkbox_widget:
                 checkbox = checkbox_widget.findChild(QCheckBox)
                 if checkbox and checkbox.isChecked():
-                    row_type = checkbox.property("row_type")
-                    if row_type == "purchase":
-                        selected_count += 1
+                    selected_count += 1
         self.selection_label.setText(f"선택된 항목: {selected_count:,}개")
 
     def get_selected_rows(self) -> List[Dict[str, Any]]:
+        """선택된 행 데이터 반환"""
         selected_items = []
         for row in range(self.rowCount()):
             checkbox_widget = self.cellWidget(row, 0)
             if checkbox_widget:
                 checkbox = checkbox_widget.findChild(QCheckBox)
                 if checkbox and checkbox.isChecked():
-                    row_type = checkbox.property("row_type")
-                    if row_type == "purchase":
-                        row_data = {}
-                        for col in range(1, self.columnCount()):
-                            header = self.horizontalHeaderItem(col)
-                            key = header.text() if header else str(col)
-                            
-                            if col == 1:  # 발주번호 컬럼
-                                widget = self.cellWidget(row, col)
-                                if widget:
-                                    label = widget.findChild(QLabel)
-                                    if label:
-                                        row_data[key] = label.text()
-                            else:
-                                cell_item = self.item(row, col)
-                                row_data[key] = cell_item.text() if cell_item else ""
-                        selected_items.append(row_data)
+                    row_data = {}
+                    for col in range(1, self.columnCount()):
+                        # 영문 필드명을 사용 (col-1 인덱스로 field_names 접근)
+                        field_name = self.field_names[col-1] if col-1 < len(self.field_names) else str(col)
+                        cell_item = self.item(row, col)
+                        row_data[field_name] = cell_item.text() if cell_item else ""
+                    selected_items.append(row_data)
         return selected_items
 
     def select_all(self):
+        """모든 항목 선택"""
         self._is_bulk_update = True
         for row in range(self.rowCount()):
             checkbox_widget = self.cellWidget(row, 0)
             if checkbox_widget:
                 checkbox = checkbox_widget.findChild(QCheckBox)
                 if checkbox:
-                    row_type = checkbox.property("row_type")
-                    if row_type == "purchase":  # 발주 행만 선택
-                        checkbox.setChecked(True)
+                    checkbox.setChecked(True)
         self._emit_selection_changed(is_bulk_update=True)
         self._is_bulk_update = False
 
     def clear_selection(self):
+        """모든 선택 해제"""
         self._is_bulk_update = True
         for row in range(self.rowCount()):
             checkbox_widget = self.cellWidget(row, 0)
@@ -375,4 +221,53 @@ class FboPoTable(BaseTable):
                 if checkbox:
                     checkbox.setChecked(False)
         self._emit_selection_changed(is_bulk_update=True)
-        self._is_bulk_update = False 
+        self._is_bulk_update = False
+
+    def update_item_status(self, item_id: str, status: str, processed_at: str = None):
+        """특정 항목의 상태 업데이트"""
+        for row in range(self.rowCount()):
+            # ID 컬럼 (인덱스 1)에서 해당 ID 찾기
+            id_item = self.item(row, 1)
+            if id_item and id_item.text() == item_id:
+                # field_names에서 각 필드의 컬럼 인덱스 계산 (체크박스 컬럼 고려해서 +1)
+                # message_status = 인덱스 13 → 컬럼 14 (체크박스 때문에 +1)
+                # processed_at = 인덱스 14 → 컬럼 15 (체크박스 때문에 +1)
+                
+                try:
+                    message_status_col = self.field_names.index("message_status") + 1
+                    processed_at_col = self.field_names.index("processed_at") + 1
+                    
+                    # 메시지 상태 컬럼 업데이트
+                    status_item = self.item(row, message_status_col)
+                    if status_item:
+                        # 한글 상태로 변환
+                        korean_status = MESSAGE_STATUS_LABELS.get(status, status)
+                        status_item.setText(korean_status)
+                    
+                    # 처리시각 컬럼 업데이트 (제공된 경우)
+                    if processed_at:
+                        processed_item = self.item(row, processed_at_col)
+                        if processed_item:
+                            # 날짜/시간 포맷팅
+                            formatted_time = self.format_datetime(processed_at) if hasattr(self, 'format_datetime') else processed_at
+                            processed_item.setText(formatted_time)
+                    
+                except ValueError as e:
+                    # 필드명을 찾을 수 없는 경우 기존 방식 사용
+                    status_item = self.item(row, 14)  # 기존 하드코딩된 인덱스
+                    if status_item:
+                        korean_status = MESSAGE_STATUS_LABELS.get(status, status)
+                        status_item.setText(korean_status)
+                break
+
+    def get_all_data(self):
+        """테이블의 모든 데이터 반환"""
+        all_data = []
+        for row in range(self.rowCount()):
+            row_data = {}
+            for col in range(1, self.columnCount()):
+                field_name = self.field_names[col-1] if col-1 < len(self.field_names) else str(col)
+                cell_item = self.item(row, col)
+                row_data[field_name] = cell_item.text() if cell_item else ""
+            all_data.append(row_data)
+        return all_data 

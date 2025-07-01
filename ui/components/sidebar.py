@@ -217,13 +217,13 @@ class Sidebar(QWidget):
         self.scroll_layout.addWidget(fbo_shipment_req_btn)
         self._buttons[SectionType.FBO_SHIPMENT_REQUEST.value] = fbo_shipment_req_btn
         
-        # FBO 출고 확인
-        fbo_shipment_conf_btn = SidebarButton("출고 확인", icon_name="ph.check")
-        fbo_shipment_conf_btn.clicked.connect(
-            lambda: self._on_button_clicked(SectionType.FBO_SHIPMENT_CONFIRM.value)
-        )
-        self.scroll_layout.addWidget(fbo_shipment_conf_btn)
-        self._buttons[SectionType.FBO_SHIPMENT_CONFIRM.value] = fbo_shipment_conf_btn
+        # FBO 출고 확인 - 현재 사용하지 않는 기능으로 임시 숨김
+        # fbo_shipment_conf_btn = SidebarButton("출고 확인", icon_name="ph.check")
+        # fbo_shipment_conf_btn.clicked.connect(
+        #     lambda: self._on_button_clicked(SectionType.FBO_SHIPMENT_CONFIRM.value)
+        # )
+        # self.scroll_layout.addWidget(fbo_shipment_conf_btn)
+        # self._buttons[SectionType.FBO_SHIPMENT_CONFIRM.value] = fbo_shipment_conf_btn
         
         # FBO 발주 확인
         fbo_po_btn = SidebarButton("발주 확인", icon_name="ph.clipboard-text")

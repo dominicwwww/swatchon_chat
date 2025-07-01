@@ -451,7 +451,11 @@ class TemplateSection(BaseSection):
             else:
                 value_text = str(value)
             
-            self.conditions_table.setItem(row, 0, QTableWidgetItem(field_text))
+            # 테이블 아이템 생성 및 원본 데이터 저장
+            field_item = QTableWidgetItem(field_text)
+            field_item.setData(Qt.UserRole, condition)  # 원본 조건 데이터 저장
+            
+            self.conditions_table.setItem(row, 0, field_item)
             self.conditions_table.setItem(row, 1, QTableWidgetItem(condition.get("operator", "")))
             self.conditions_table.setItem(row, 2, QTableWidgetItem(value_text))
             self.conditions_table.setItem(row, 3, QTableWidgetItem(condition.get("template", "")))
@@ -480,18 +484,30 @@ class TemplateSection(BaseSection):
             QMessageBox.warning(self, "경고", "수정할 조건을 선택해주세요.")
             return
         
-        # 기존 조건 데이터 가져오기
-        field = self.conditions_table.item(current_row, 0).text() if self.conditions_table.item(current_row, 0) else ""
-        operator = self.conditions_table.item(current_row, 1).text() if self.conditions_table.item(current_row, 1) else ""
-        value = self.conditions_table.item(current_row, 2).text() if self.conditions_table.item(current_row, 2) else ""
-        template = self.conditions_table.item(current_row, 3).text() if self.conditions_table.item(current_row, 3) else ""
+        # 원본 조건 데이터 가져오기
+        field_item = self.conditions_table.item(current_row, 0)
+        if not field_item:
+            QMessageBox.warning(self, "경고", "조건 데이터를 찾을 수 없습니다.")
+            return
         
-        condition = {
-            "field": field,
-            "operator": operator,
-            "value": value,
-            "template": template
-        }
+        # UserRole에서 원본 조건 데이터 가져오기
+        original_condition = field_item.data(Qt.UserRole)
+        if original_condition:
+            # 원본 데이터가 있으면 사용
+            condition = original_condition
+        else:
+            # 원본 데이터가 없으면 테이블 텍스트로 재구성 (fallback)
+            field_text = field_item.text() if field_item else ""
+            operator_text = self.conditions_table.item(current_row, 1).text() if self.conditions_table.item(current_row, 1) else ""
+            value_text = self.conditions_table.item(current_row, 2).text() if self.conditions_table.item(current_row, 2) else ""
+            template_text = self.conditions_table.item(current_row, 3).text() if self.conditions_table.item(current_row, 3) else ""
+            
+            condition = {
+                "field": field_text,
+                "operator": operator_text,
+                "value": value_text,
+                "template": template_text
+            }
         
         dialog = ConditionDialog(self, condition)
         if dialog.exec():
@@ -499,9 +515,30 @@ class TemplateSection(BaseSection):
     
     def _update_condition_in_table(self, row: int, condition: Dict):
         """테이블의 조건 업데이트"""
-        self.conditions_table.setItem(row, 0, QTableWidgetItem(condition.get("field", "")))
+        # 이전 형식 (field)과 새로운 형식 (fields) 모두 처리
+        if "fields" in condition:
+            fields = condition["fields"]
+            if isinstance(fields, list):
+                field_text = ", ".join(fields)
+            else:
+                field_text = str(fields)
+        else:
+            field_text = condition.get("field", "")
+        
+        # 값 처리
+        value = condition.get("value", "")
+        if isinstance(value, dict):
+            value_text = ", ".join(f"{k}: {v}" for k, v in value.items())
+        else:
+            value_text = str(value)
+        
+        # 필드 아이템 생성 및 원본 데이터 저장
+        field_item = QTableWidgetItem(field_text)
+        field_item.setData(Qt.UserRole, condition)  # 원본 조건 데이터 저장
+        
+        self.conditions_table.setItem(row, 0, field_item)
         self.conditions_table.setItem(row, 1, QTableWidgetItem(condition.get("operator", "")))
-        self.conditions_table.setItem(row, 2, QTableWidgetItem(str(condition.get("value", ""))))
+        self.conditions_table.setItem(row, 2, QTableWidgetItem(value_text))
         self.conditions_table.setItem(row, 3, QTableWidgetItem(condition.get("template", "")))
     
     def _on_refresh_data_clicked(self):

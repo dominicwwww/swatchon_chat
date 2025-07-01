@@ -11,8 +11,12 @@ import glob
 
 from core.types import OrderType, FboOperationType, SboOperationType, ShipmentStatus
 from services.api_service import ApiService
-from core.schemas import PurchaseProduct
+from core.schemas import (
+    PurchaseProduct, PurchaseProductList, MessageStatus, 
+    PurchaseConfirm, PurchaseConfirmList
+)
 from ui.components.log_widget import LOG_INFO, LOG_DEBUG, LOG_WARNING, LOG_ERROR, LOG_SUCCESS
+from core.constants import MESSAGE_STATUS_LABELS
 
 
 class DataManager(QObject):
@@ -43,29 +47,31 @@ class DataManager(QObject):
         """
         super().__init__()
         self.order_type = order_type
+        self.log_function = log_function
         
-        # 데이터 디렉토리 설정 - 루트의 data 디렉토리 사용
+        # 데이터 저장소
+        self.data: List[PurchaseProduct] = []
+        self.filtered_data: List[PurchaseProduct] = []
+        self.purchase_products_data: Dict[str, List[Dict[str, Any]]] = {}
+        
+        # 파일 경로 설정
         if data_dir is None:
-            # 프로젝트 루트의 data 디렉토리
             project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-            self.data_dir = os.path.join(project_root, 'data', 'api_cache')
-        else:
-            self.data_dir = data_dir
+            data_dir = os.path.join(project_root, 'data', 'api_cache')
         
-        # 디렉토리가 없으면 생성
+        self.data_dir = data_dir
         os.makedirs(self.data_dir, exist_ok=True)
         
-        self.log_function = log_function or print
+        # 파일명 프리픽스 설정
+        if order_type == OrderType.FBO:
+            self.file_prefix = "fbo_products"
+        elif order_type == OrderType.SBO:
+            self.file_prefix = "sbo_products"
+        else:
+            self.file_prefix = "products"  # 기본값
         
         # 서비스 인스턴스
         self.api_service = ApiService()
-        
-        # 데이터 저장소
-        self.all_data: List[PurchaseProduct] = []
-        self.filtered_data: List[PurchaseProduct] = []
-        
-        # 발주프로덕트 데이터 저장소 추가
-        self.purchase_products: Dict[str, List[Dict[str, Any]]] = {}  # 발주번호별 프로덕트 목록
         
         # 필터 상태
         self.current_search_text = ""
@@ -109,53 +115,45 @@ class DataManager(QObject):
             
             self.log(f"API에서 총 {len(items)}건의 데이터를 가져왔습니다.", LOG_INFO)
             
-            # 데이터 변환 및 오늘 날짜까지 필터링
+            # 데이터 변환 및 필터링
             purchase_products = []
-            today_date = date.today()
             
             for item in items:
                 try:
                     product_data = self._map_api_response_to_product_data(item)
                     
-                    # pickup_at이 오늘 날짜까지인 데이터만 필터링
-                    pickup_date = product_data['pickup_at']
-                    if isinstance(pickup_date, datetime):
-                        pickup_date = pickup_date.date()
-                    elif isinstance(pickup_date, str):
-                        try:
-                            pickup_date = datetime.strptime(pickup_date, '%Y-%m-%d').date()
-                        except ValueError:
-                            continue
+                    # status가 'confirmed' 또는 'delivery_requested'인 항목만 처리
+                    if product_data.get('status') not in ['confirmed', 'delivery_requested']:
+                        continue
                     
-                    if pickup_date <= today_date:
-                        product = PurchaseProduct(**product_data)
-                        purchase_products.append(product)
+                    product = PurchaseProduct(**product_data)
+                    purchase_products.append(product)
                     
                 except Exception as e:
                     self.log(f"데이터 변환 실패: {str(e)}", LOG_WARNING)
                     continue
             
-            self.log(f"오늘 날짜까지의 데이터 {len(purchase_products)}건을 필터링했습니다.", LOG_INFO)
+            self.log(f"confirmed/delivery_requested 상태의 데이터 {len(purchase_products)}건을 필터링했습니다.", LOG_INFO)
             
             # 기존 데이터와 병합 (새로운 방식)
             merged_data, stats = self.merge_data_with_existing(purchase_products)
             
             # 로그 출력
-            if stats['new_count'] > 0 or stats['updated_count'] > 0:
-                self.log(f"데이터 업데이트 - 신규: {stats['new_count']}건, 변경: {stats['updated_count']}건, 유지: {stats['unchanged_count']}건", LOG_SUCCESS)
+            if stats['new_count'] > 0 or stats['updated_count'] > 0 or stats['deleted_count'] > 0:
+                self.log(f"데이터 업데이트 - 신규: {stats['new_count']}건, 변경: {stats['updated_count']}건, 유지: {stats['unchanged_count']}건, 삭제: {stats['deleted_count']}건", LOG_SUCCESS)
             else:
                 self.log(f"변경사항 없음 - 총 {stats['total_count']}건", LOG_INFO)
             
             # 데이터 저장
-            self.all_data = merged_data
-            self.filtered_data = self.all_data.copy()
+            self.data = merged_data
+            self.filtered_data = self.data.copy()
             self.current_data_date = today
             
             # 오늘 날짜로 캐시 파일 저장
             self._save_today_cache_file()
             
             # 시그널 발생
-            self.data_loaded.emit(self.all_data)
+            self.data_loaded.emit(self.data)
             
             return True
             
@@ -189,7 +187,7 @@ class DataManager(QObject):
             
             # PurchaseProduct 객체를 딕셔너리로 변환
             data_dicts = []
-            for item in self.all_data:
+            for item in self.data:
                 item_dict = self._purchase_product_to_dict(item)
                 data_dicts.append(item_dict)
             
@@ -213,6 +211,10 @@ class DataManager(QObject):
             purchase_products = []
             for item_data in data:
                 try:
+                    # status가 'confirmed' 또는 'delivery_requested'인 항목만 처리
+                    if item_data.get('status') not in ['confirmed', 'delivery_requested']:
+                        continue
+                    
                     # 날짜 필드 처리
                     if isinstance(item_data.get('pickup_at'), str):
                         item_data['pickup_at'] = self._safe_datetime_convert(item_data['pickup_at'])
@@ -237,12 +239,12 @@ class DataManager(QObject):
                     continue
             
             # 데이터 저장
-            self.all_data = purchase_products
-            self.filtered_data = self.all_data.copy()
+            self.data = purchase_products
+            self.filtered_data = self.data.copy()
             self.current_data_date = date.today().strftime('%y%m%d')
             
             # 시그널 발생
-            self.data_loaded.emit(self.all_data)
+            self.data_loaded.emit(self.data)
             
             self.log(f"캐시된 데이터를 로드했습니다: {len(purchase_products)}건", LOG_SUCCESS)
             return True
@@ -253,12 +255,12 @@ class DataManager(QObject):
     
     def _preserve_existing_message_status(self, new_data: List[PurchaseProduct]) -> List[PurchaseProduct]:
         """기존 데이터의 메시지 상태와 처리 시각을 새 데이터에 적용"""
-        if not self.all_data:
+        if not self.data:
             return new_data
         
         # 기존 데이터를 ID로 매핑
         existing_status_map = {}
-        for item in self.all_data:
+        for item in self.data:
             existing_status_map[item.id] = {
                 'message_status': getattr(item, 'message_status', ShipmentStatus.PENDING.value),
                 'processed_at': getattr(item, 'processed_at', None)
@@ -288,21 +290,24 @@ class DataManager(QObject):
         Returns:
             tuple: (병합된 데이터, 통계 정보)
         """
-        if not self.all_data:
+        if not self.data:
             # 기존 데이터가 없으면 모두 새 데이터
             return new_data, {
                 'new_count': len(new_data),
                 'updated_count': 0,
                 'unchanged_count': 0,
+                'deleted_count': 0,
                 'total_count': len(new_data)
             }
         
         # 기존 데이터를 ID로 매핑
-        existing_map = {item.id: item for item in self.all_data}
+        existing_map = {item.id: item for item in self.data}
+        new_data_ids = {item.id for item in new_data}
         
         updated_count = 0
         new_count = 0
         unchanged_count = 0
+        deleted_count = 0
         merged_data = []
         
         # 새 데이터 처리
@@ -328,10 +333,17 @@ class DataManager(QObject):
                 merged_data.append(new_item)
                 new_count += 1
         
+        # API에서 삭제된 항목 감지
+        deleted_count = len([item_id for item_id in existing_map.keys() if item_id not in new_data_ids])
+        
+        if deleted_count > 0:
+            self.log(f"API에서 삭제된 항목 {deleted_count}개가 감지되어 로컬 데이터에서 제거됩니다.", LOG_INFO)
+        
         stats = {
             'new_count': new_count,
             'updated_count': updated_count,
             'unchanged_count': unchanged_count,
+            'deleted_count': deleted_count,
             'total_count': len(merged_data)
         }
         
@@ -343,7 +355,9 @@ class DataManager(QObject):
         compare_fields = [
             'store_name', 'store_address', 'store_ddm_address', 'quality_name',
             'color_code', 'quantity', 'purchase_code', 'pickup_at', 
-            'delivery_method', 'logistics_company', 'status'
+            'delivery_method', 'logistics_company', 'status',
+            # 새로 추가된 필드들
+            'additional_info', 'price', 'unit_price', 'unit_price_origin'
         ]
         
         for field in compare_fields:
@@ -389,9 +403,16 @@ class DataManager(QObject):
             'purchase_url': item.get('purchase_url'),
             'last_pickup_at': self._safe_datetime_convert(item.get('last_pickup_at')) if item.get('last_pickup_at') else None,
             'pickup_at': item.get('pickup_at', item.get('최종출고일자', datetime.now().isoformat())),
-            'delivery_method': item.get('delivery_method', self._map_delivery_method(item.get('발주배송수단', ''))),
+            'delivery_method': self._map_delivery_method(item.get('delivery_method', item.get('발주배송수단', ''))),
             'logistics_company': item.get('logistics_company', self._map_logistics_company(item.get('판매자발송수단', ''))),
-            'status': item.get('status', item.get('발주상태', ''))
+            'status': item.get('status', item.get('발주상태', '')),
+            # 새로 추가된 필드들
+            'price': item.get('price'),
+            'unit_price': item.get('unit_price'),
+            'unit_price_origin': item.get('unit_price_origin'),
+            'additional_info': item.get('additional_info'),
+            'created_at': self._safe_datetime_convert(item.get('created_at')) if item.get('created_at') else None,
+            'updated_at': self._safe_datetime_convert(item.get('updated_at')) if item.get('updated_at') else None
         }
         
         # 숫자 필드 변환
@@ -447,23 +468,25 @@ class DataManager(QObject):
                 return datetime.now()
         return value if isinstance(value, datetime) else datetime.now()
     
-    def _map_delivery_method(self, original_value: str) -> str:
+    def _map_delivery_method(self, original_value: str) -> Optional[str]:
         """배송방법 매핑"""
-        if not original_value:
-            return ""
+        if not original_value or original_value in [None, "None", ""]:
+            return None  # None 값은 그대로 반환
         
         mapping = {
             "동대문퀵": "quick",
             "동대문 픽업": "quick",
             "판매자발송": "logistics",
-            "판매자 발송": "logistics"
+            "판매자 발송": "logistics",
+            "quick": "quick",
+            "logistics": "logistics"
         }
         
-        return mapping.get(original_value, original_value.lower())
+        return mapping.get(original_value, original_value.lower() if isinstance(original_value, str) else None)
     
-    def _map_logistics_company(self, original_value: str) -> str:
+    def _map_logistics_company(self, original_value: str) -> Optional[str]:
         """물류회사 매핑"""
-        if not original_value or original_value == "-":
+        if not original_value or original_value in [None, "None", "", "-"]:
             return None
         
         mapping = {
@@ -473,21 +496,21 @@ class DataManager(QObject):
             "퀵서비스": "quick_truck"
         }
         
-        return mapping.get(original_value, original_value.lower())
+        return mapping.get(original_value, original_value.lower() if isinstance(original_value, str) else None)
     
     def save_data(self, data: List[PurchaseProduct] = None) -> Optional[str]:
         """
         데이터를 JSON 파일로 저장 (현재 날짜 캐시 파일 업데이트)
         
         Args:
-            data: 저장할 데이터 (None이면 self.all_data 사용)
+            data: 저장할 데이터 (None이면 self.data 사용)
             
         Returns:
             Optional[str]: 저장된 파일 경로
         """
         try:
             if data is None:
-                data = self.all_data
+                data = self.data
             
             # 현재 날짜 캐시 파일 업데이트
             return self._save_today_cache_file()
@@ -524,7 +547,14 @@ class DataManager(QObject):
             'logistics_company': item.logistics_company,
             'status': item.status,
             'message_status': getattr(item, 'message_status', '대기중'),
-            'processed_at': item.processed_at.isoformat() if item.processed_at and hasattr(item.processed_at, 'isoformat') else (str(item.processed_at) if item.processed_at else None)
+            'processed_at': item.processed_at.isoformat() if item.processed_at and hasattr(item.processed_at, 'isoformat') else (str(item.processed_at) if item.processed_at else None),
+            # 새로 추가된 필드들
+            'price': getattr(item, 'price', None),
+            'unit_price': getattr(item, 'unit_price', None),
+            'unit_price_origin': getattr(item, 'unit_price_origin', None),
+            'additional_info': getattr(item, 'additional_info', None),
+            'created_at': item.created_at.isoformat() if getattr(item, 'created_at', None) and hasattr(item.created_at, 'isoformat') else (str(item.created_at) if getattr(item, 'created_at', None) else None),
+            'updated_at': item.updated_at.isoformat() if getattr(item, 'updated_at', None) and hasattr(item.updated_at, 'isoformat') else (str(item.updated_at) if getattr(item, 'updated_at', None) else None)
         }
     
     def apply_filters(self, search_text: str = "", status_filter: str = "all") -> List[PurchaseProduct]:
@@ -543,7 +573,7 @@ class DataManager(QObject):
             self.current_status_filter = status_filter
             
             # 전체 데이터에서 시작
-            filtered_data = self.all_data.copy()
+            filtered_data = self.data.copy()
             
             # 검색어 필터 적용
             if search_text:
@@ -586,7 +616,7 @@ class DataManager(QObject):
         Returns:
             Dict[str, str]: 통계 정보 (문자열)
         """
-        if not self.all_data:
+        if not self.data:
             return {
                 'total': '0',
                 'pending': '0',
@@ -596,12 +626,12 @@ class DataManager(QObject):
                 'cancelled': '0'
             }
         stats = {
-            'total': len(self.all_data),
-            'pending': len([item for item in self.all_data if getattr(item, 'message_status', '대기중') in [ShipmentStatus.PENDING.value, "대기중", ""]]),
-            'sending': len([item for item in self.all_data if getattr(item, 'message_status', '대기중') == ShipmentStatus.SENDING.value]),
-            'sent': len([item for item in self.all_data if getattr(item, 'message_status', '대기중') == ShipmentStatus.SENT.value]),
-            'failed': len([item for item in self.all_data if getattr(item, 'message_status', '대기중') == ShipmentStatus.FAILED.value]),
-            'cancelled': len([item for item in self.all_data if getattr(item, 'message_status', '대기중') == ShipmentStatus.CANCELLED.value])
+            'total': len(self.data),
+            'pending': len([item for item in self.data if getattr(item, 'message_status', '대기중') in [ShipmentStatus.PENDING.value, "대기중", ""]]),
+            'sending': len([item for item in self.data if getattr(item, 'message_status', '대기중') == ShipmentStatus.SENDING.value]),
+            'sent': len([item for item in self.data if getattr(item, 'message_status', '대기중') == ShipmentStatus.SENT.value]),
+            'failed': len([item for item in self.data if getattr(item, 'message_status', '대기중') == ShipmentStatus.FAILED.value]),
+            'cancelled': len([item for item in self.data if getattr(item, 'message_status', '대기중') == ShipmentStatus.CANCELLED.value])
         }
         # 3자리 콤마 포맷
         return {k: f"{v:,}" for k, v in stats.items()}
@@ -619,8 +649,8 @@ class DataManager(QObject):
             updated_count = 0
             current_time = datetime.now() if set_processed_time else None
             
-            # all_data에서 업데이트
-            for item in self.all_data:
+            # data에서 업데이트
+            for item in self.data:
                 if item.id in item_ids:
                     item.message_status = status
                     if set_processed_time:
@@ -649,7 +679,7 @@ class DataManager(QObject):
     
     def get_all_data(self) -> List[PurchaseProduct]:
         """전체 데이터 반환"""
-        return self.all_data
+        return self.data
     
     def get_filtered_data(self) -> List[PurchaseProduct]:
         """필터링된 데이터 반환"""
@@ -657,7 +687,7 @@ class DataManager(QObject):
     
     def clear_data(self):
         """데이터 초기화"""
-        self.all_data = []
+        self.data = []
         self.filtered_data = []
         self.current_search_text = ""
         self.current_status_filter = "all" 
@@ -679,25 +709,17 @@ class DataManager(QObject):
             
             # 새 데이터 변환
             new_purchase_products = []
-            today_date = date.today()
             
             for item in items:
                 try:
                     product_data = self._map_api_response_to_product_data(item)
                     
-                    # pickup_at이 오늘 날짜까지인 데이터만 필터링
-                    pickup_date = product_data['pickup_at']
-                    if isinstance(pickup_date, datetime):
-                        pickup_date = pickup_date.date()
-                    elif isinstance(pickup_date, str):
-                        try:
-                            pickup_date = datetime.strptime(pickup_date, '%Y-%m-%d').date()
-                        except ValueError:
-                            continue
+                    # status가 'confirmed' 또는 'delivery_requested'인 항목만 처리
+                    if product_data.get('status') not in ['confirmed', 'delivery_requested']:
+                        continue
                     
-                    if pickup_date <= today_date:
-                        product = PurchaseProduct(**product_data)
-                        new_purchase_products.append(product)
+                    product = PurchaseProduct(**product_data)
+                    new_purchase_products.append(product)
                     
                 except Exception as e:
                     self.log(f"데이터 변환 실패: {str(e)}", LOG_WARNING)
@@ -707,18 +729,18 @@ class DataManager(QObject):
             merged_data, stats = self.merge_data_with_existing(new_purchase_products)
             
             # 변경사항이 있는 경우에만 업데이트
-            if stats['new_count'] > 0 or stats['updated_count'] > 0:
-                self.log(f"데이터 업데이트 - 신규: {stats['new_count']}건, 변경: {stats['updated_count']}건, 유지: {stats['unchanged_count']}건", LOG_SUCCESS)
+            if stats['new_count'] > 0 or stats['updated_count'] > 0 or stats['deleted_count'] > 0:
+                self.log(f"데이터 업데이트 - 신규: {stats['new_count']}건, 변경: {stats['updated_count']}건, 유지: {stats['unchanged_count']}건, 삭제: {stats['deleted_count']}건", LOG_SUCCESS)
                 
                 # 데이터 저장
-                self.all_data = merged_data
-                self.filtered_data = self.all_data.copy()
+                self.data = merged_data
+                self.filtered_data = self.data.copy()
                 
                 # 캐시 파일 다시 저장
                 self._save_today_cache_file()
                 
                 # 시그널 발생
-                self.data_loaded.emit(self.all_data)
+                self.data_loaded.emit(self.data)
             else:
                 self.log(f"변경사항 없음 - 총 {stats['total_count']}건", LOG_INFO)
             
@@ -741,16 +763,16 @@ class DataManager(QObject):
         """
         try:
             # 메모리에 저장
-            self.purchase_products[purchase_code] = products
+            self.purchase_products_data[purchase_code] = products
             
             # 파일로도 저장 (발주번호별 개별 파일)
             today = date.today().strftime('%y%m%d')
             timestamp = datetime.now().strftime('%H%M')
-            filename = f'fbo_products_{purchase_code}_{today}-{timestamp}.json'
+            filename = f'{self.file_prefix}_{purchase_code}_{today}-{timestamp}.json'
             file_path = os.path.join(self.data_dir, filename)
             
             # 기존 해당 발주번호 파일들 삭제
-            existing_files = glob.glob(os.path.join(self.data_dir, f'fbo_products_{purchase_code}_*.json'))
+            existing_files = glob.glob(os.path.join(self.data_dir, f'{self.file_prefix}_{purchase_code}_*.json'))
             for old_file in existing_files:
                 try:
                     os.remove(old_file)
@@ -760,11 +782,11 @@ class DataManager(QObject):
             with open(file_path, 'w', encoding='utf-8') as f:
                 json.dump(products, f, ensure_ascii=False, indent=2)
             
-            self.log(f"발주번호 {purchase_code}의 프로덕트 데이터를 저장했습니다: {filename}", LOG_SUCCESS)
+            self.log(f"{self.file_prefix} 번호 {purchase_code}의 프로덕트 데이터를 저장했습니다: {filename}", LOG_SUCCESS)
             return True
             
         except Exception as e:
-            self.log(f"발주프로덕트 데이터 저장 중 오류: {str(e)}", LOG_ERROR)
+            self.log(f"{self.file_prefix} 번호 {purchase_code}의 프로덕트 데이터 저장 중 오류: {str(e)}", LOG_ERROR)
             return False
     
     def load_purchase_products(self, purchase_code: str) -> List[Dict[str, Any]]:
@@ -779,11 +801,11 @@ class DataManager(QObject):
         """
         try:
             # 메모리에서 먼저 확인
-            if purchase_code in self.purchase_products:
-                return self.purchase_products[purchase_code]
+            if purchase_code in self.purchase_products_data:
+                return self.purchase_products_data[purchase_code]
             
             # 파일에서 로드
-            pattern = os.path.join(self.data_dir, f'fbo_products_{purchase_code}_*.json')
+            pattern = os.path.join(self.data_dir, f'{self.file_prefix}_{purchase_code}_*.json')
             files = glob.glob(pattern)
             
             if files:
@@ -794,21 +816,21 @@ class DataManager(QObject):
                     products = json.load(f)
                 
                 # 메모리에 캐시
-                self.purchase_products[purchase_code] = products
+                self.purchase_products_data[purchase_code] = products
                 
-                self.log(f"발주번호 {purchase_code}의 프로덕트 데이터를 로드했습니다: {len(products)}건", LOG_INFO)
+                self.log(f"{self.file_prefix} 번호 {purchase_code}의 프로덕트 데이터를 로드했습니다: {len(products)}건", LOG_INFO)
                 return products
             
             # 데이터가 없으면 빈 리스트 반환
             return []
             
         except Exception as e:
-            self.log(f"발주프로덕트 데이터 로드 중 오류: {str(e)}", LOG_ERROR)
+            self.log(f"{self.file_prefix} 번호 {purchase_code}의 프로덕트 데이터 로드 중 오류: {str(e)}", LOG_ERROR)
             return []
     
     def get_all_purchase_products(self) -> Dict[str, List[Dict[str, Any]]]:
         """모든 발주프로덕트 데이터 반환"""
-        return self.purchase_products
+        return self.purchase_products_data
     
     def clear_purchase_products(self, purchase_code: str = None):
         """발주프로덕트 데이터 삭제
@@ -817,7 +839,179 @@ class DataManager(QObject):
             purchase_code: 특정 발주번호 (None이면 전체 삭제)
         """
         if purchase_code:
-            if purchase_code in self.purchase_products:
-                del self.purchase_products[purchase_code]
+            if purchase_code in self.purchase_products_data:
+                del self.purchase_products_data[purchase_code]
         else:
-            self.purchase_products.clear() 
+            self.purchase_products_data.clear()
+
+    # FBO 발주 확인용 메서드들
+    def load_purchase_confirms_from_api(self) -> bool:
+        """FBO 발주 확인 데이터를 API에서 로드"""
+        try:
+            api_service = ApiService()
+            response = api_service.get_purchase_confirms()
+            
+            if response:
+                purchase_confirms = []
+                for item in response:
+                    # status가 'requested'인 항목만 처리
+                    if item.get('status') != 'requested':
+                        continue
+                    purchase_confirm = PurchaseConfirm(
+                        purchase_code=item.get("purchase_code", ""),
+                        purchase_type=item.get("purchase_type", ""),
+                        created_at=item.get("created_at", ""),
+                        order_code=item.get("order_code", ""),
+                        seller=item.get("store_name", ""),
+                        in_charge=item.get("in_charge", ""),
+                        quantity=str(item.get("quantity", "")),
+                        price=str(item.get("price", "")),
+                        price_changeable=item.get("price_changeable", ""),
+                        delay_allowable=item.get("delay_allowable", ""),
+                        status="requested",
+                        payment_status=item.get("payment_status", ""),
+                        internal_memo=item.get("internal_memo", ""),
+                        message_status=item.get("message_status", MessageStatus.PENDING.value),
+                        processed_at=self._safe_datetime_convert(item.get("processed_at"))
+                    )
+                    
+                    # 같은 purchase_code를 가진 아이템들을 프로덕트로 그룹화
+                    purchase_confirm.products = [
+                        PurchaseProduct(**self._map_api_response_to_product_data(item))
+                    ]
+                    
+                    purchase_confirms.append(purchase_confirm)
+                
+                # purchase_code별로 그룹화하여 중복 제거 및 프로덕트 병합
+                grouped_confirms = {}
+                for confirm in purchase_confirms:
+                    if confirm.purchase_code in grouped_confirms:
+                        # 기존 데이터에 프로덕트 추가
+                        grouped_confirms[confirm.purchase_code].products.extend(confirm.products)
+                    else:
+                        grouped_confirms[confirm.purchase_code] = confirm
+                
+                self.data = list(grouped_confirms.values())
+                self.filtered_data = self.data.copy()
+                
+                self.log(f"{self.file_prefix} 발주 확인 데이터 {len(self.data)}건을 API에서 로드했습니다.", LOG_SUCCESS)
+                self.data_loaded.emit(self.data)
+                return True
+            else:
+                self.log("API에서 FBO 발주 확인 데이터를 가져올 수 없습니다.", LOG_ERROR)
+                return False
+                
+        except Exception as e:
+            self.log(f"{self.file_prefix} 발주 확인 API 로드 중 오류: {str(e)}", LOG_ERROR)
+            self.error_occurred.emit(str(e))
+            return False
+
+    def _map_api_to_purchase_confirm(self, item: Dict[str, Any]) -> PurchaseConfirm:
+        """API 응답을 PurchaseConfirm 객체로 매핑"""
+        return PurchaseConfirm(
+            purchase_code=item.get("purchase_code", ""),
+            purchase_type=item.get("purchase_type", ""),
+            created_at=item.get("created_at", ""),
+            order_code=item.get("order_code", ""),
+            seller=item.get("store_name", ""),
+            in_charge=item.get("in_charge", ""),
+            quantity=str(item.get("quantity", "")),
+            price=str(item.get("price", "")),
+            price_changeable=item.get("price_changeable", ""),
+            delay_allowable=item.get("delay_allowable", ""),
+            status=item.get("status", ""),
+            payment_status=item.get("payment_status", ""),
+            internal_memo=item.get("internal_memo", ""),
+            message_status=item.get("message_status", MessageStatus.PENDING.value),
+            processed_at=self._safe_datetime_convert(item.get("processed_at"))
+        )
+
+    def save_purchase_confirms(self, data: List[PurchaseConfirm] = None) -> Optional[str]:
+        """발주 확인 데이터를 flat product 구조로 파일로 저장"""
+        try:
+            if data is None:
+                data = self.data
+
+            # flat product 구조로 변환
+            flat_products = []
+            for confirm in data:
+                for product in confirm.products:
+                    row = {
+                        "id": product.id,
+                        "image_url": getattr(product, 'image_url', None),
+                        "print_url": getattr(product, 'print_url', None),
+                        "store_name": product.store_name,
+                        "store_url": getattr(product, 'store_url', None),
+                        "store_address": product.store_address,
+                        "store_ddm_address": product.store_ddm_address,
+                        "quality_code": getattr(product, 'quality_code', None),
+                        "quality_name": product.quality_name,
+                        "quality_url": getattr(product, 'quality_url', None),
+                        "swatch_pickupable": getattr(product, 'swatch_pickupable', None),
+                        "swatch_storage": getattr(product, 'swatch_storage', None),
+                        "color_number": product.color_number,
+                        "color_code": product.color_code,
+                        "quantity": product.quantity,
+                        "order_code": getattr(product, 'order_code', None),
+                        "order_url": getattr(product, 'order_url', None),
+                        "purchase_code": confirm.purchase_code,
+                        "purchase_url": getattr(product, 'purchase_url', None),
+                        "last_pickup_at": product.last_pickup_at,
+                        "pickup_at": product.pickup_at,
+                        "delivery_method": product.delivery_method,
+                        "logistics_company": product.logistics_company,
+                        "status": confirm.status,
+                        "message_status": self._map_message_status_to_korean(confirm.message_status),
+                        "processed_at": confirm.processed_at,
+                        "price": getattr(product, 'price', None),
+                        "unit_price": getattr(product, 'unit_price', None),
+                        "unit_price_origin": getattr(product, 'unit_price_origin', None),
+                        "additional_info": getattr(product, 'additional_info', None),
+                        "created_at": getattr(product, 'created_at', None),
+                        "updated_at": getattr(product, 'updated_at', None),
+                        # 필요시 confirm의 다른 필드도 추가
+                    }
+                    flat_products.append(row)
+
+            file_path = self._save_today_cache_file_custom("fbo_po_confirm", flat_products)
+            if file_path:
+                self.log(f"FBO 발주 확인 flat product 데이터를 저장했습니다: {file_path}", LOG_SUCCESS)
+                return file_path
+            else:
+                self.log("FBO 발주 확인 flat product 데이터 저장 실패", LOG_ERROR)
+                return None
+
+        except Exception as e:
+            self.log(f"FBO 발주 확인 flat product 데이터 저장 중 오류: {str(e)}", LOG_ERROR)
+            return None
+
+    def _save_today_cache_file_custom(self, prefix: str, data: List[Dict]) -> Optional[str]:
+        """커스텀 프리픽스로 오늘 날짜 캐시 파일 저장"""
+        try:
+            from datetime import datetime
+            import json
+            
+            today = datetime.now().strftime('%y%m%d')
+            timestamp = datetime.now().strftime('%H%M')
+            filename = f'{prefix}_{today}-{timestamp}.json'
+            file_path = os.path.join(self.data_dir, filename)
+            
+            # 기존 오늘 날짜 파일들 정리
+            existing_files = glob.glob(os.path.join(self.data_dir, f'{prefix}_{today}-*.json'))
+            for old_file in existing_files:
+                try:
+                    os.remove(old_file)
+                except:
+                    pass
+            
+            with open(file_path, 'w', encoding='utf-8') as f:
+                json.dump(data, f, ensure_ascii=False, indent=2, default=str)
+            
+            return file_path
+        except Exception as e:
+            self.log(f"파일 저장 중 오류: {str(e)}", LOG_ERROR)
+            return None 
+
+    def _map_message_status_to_korean(self, status: str) -> str:
+        """메시지 상태를 한글로 매핑"""
+        return MESSAGE_STATUS_LABELS.get(status, status) 

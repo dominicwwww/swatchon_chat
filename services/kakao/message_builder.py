@@ -121,7 +121,25 @@ class MessageBuilder:
         
         # 주문번호별 메시지 추가
         for order_number, order_items in order_groups.items():
-            message += f"# 주문번호: {order_number}\n"
+            # created_at 정보를 주문번호 옆에 추가
+            created_at = order_items[0].get('created_at', '') if order_items else ''
+            if created_at:
+                # created_at 날짜 포맷팅 (YYYY-MM-DDTHH:MM:SS+TZ -> YYYY-MM-DD HH:MM)
+                if "T" in created_at:
+                    date_part, time_part = created_at.split("T")
+                    time_part = time_part.split("+")[0].split("Z")[0]  # 타임존 제거
+                    if ":" in time_part:
+                        hour_min = ":".join(time_part.split(":")[:2])  # HH:MM만 추출
+                        created_at_formatted = f"{date_part} {hour_min}"
+                    else:
+                        created_at_formatted = date_part
+                else:
+                    # T가 없는 경우 그대로 사용하되 길이 제한
+                    created_at_formatted = created_at[:16] if len(created_at) >= 16 else created_at
+                
+                message += f"# 주문번호: {order_number} ({created_at_formatted} 주문)\n"
+            else:
+                message += f"# 주문번호: {order_number}\n"
             
             for item in order_items:
                 product_name = item.get('product_name', '상품명 없음')
@@ -194,7 +212,27 @@ class MessageBuilder:
             po_number = item.get('po_number', '번호 없음')
             product_name = item.get('product_name', '상품명 없음')
             quantity = item.get('quantity', 0)
-            message += f"- 발주번호: {po_number}\n"
+            
+            # created_at 정보를 발주번호 옆에 추가
+            created_at = item.get('created_at', '')
+            if created_at:
+                # created_at 날짜 포맷팅 (YYYY-MM-DDTHH:MM:SS+TZ -> YYYY-MM-DD HH:MM)
+                if "T" in created_at:
+                    date_part, time_part = created_at.split("T")
+                    time_part = time_part.split("+")[0].split("Z")[0]  # 타임존 제거
+                    if ":" in time_part:
+                        hour_min = ":".join(time_part.split(":")[:2])  # HH:MM만 추출
+                        created_at_formatted = f"{date_part} {hour_min}"
+                    else:
+                        created_at_formatted = date_part
+                else:
+                    # T가 없는 경우 그대로 사용하되 길이 제한
+                    created_at_formatted = created_at[:16] if len(created_at) >= 16 else created_at
+                
+                message += f"- 발주번호: {po_number} ({created_at_formatted} 주문)\n"
+            else:
+                message += f"- 발주번호: {po_number}\n"
+                
             message += f"- 상품명: {product_name}\n"
             message += f"- 수량: {quantity}개\n\n"
         
@@ -229,7 +267,27 @@ class MessageBuilder:
             order_number = item.get('order_number', '번호 없음')
             swatch_name = item.get('swatch_name', '스와치명 없음')
             quantity = item.get('quantity', 0)
-            message += f"- 주문번호: {order_number}\n"
+            
+            # created_at 정보를 주문번호 옆에 추가
+            created_at = item.get('created_at', '')
+            if created_at:
+                # created_at 날짜 포맷팅 (YYYY-MM-DDTHH:MM:SS+TZ -> YYYY-MM-DD HH:MM)
+                if "T" in created_at:
+                    date_part, time_part = created_at.split("T")
+                    time_part = time_part.split("+")[0].split("Z")[0]  # 타임존 제거
+                    if ":" in time_part:
+                        hour_min = ":".join(time_part.split(":")[:2])  # HH:MM만 추출
+                        created_at_formatted = f"{date_part} {hour_min}"
+                    else:
+                        created_at_formatted = date_part
+                else:
+                    # T가 없는 경우 그대로 사용하되 길이 제한
+                    created_at_formatted = created_at[:16] if len(created_at) >= 16 else created_at
+                
+                message += f"- 주문번호: {order_number} ({created_at_formatted} 주문)\n"
+            else:
+                message += f"- 주문번호: {order_number}\n"
+                
             message += f"- 스와치명: {swatch_name}\n"
             message += f"- 수량: {quantity}개\n\n"
         
@@ -273,7 +331,26 @@ class MessageBuilder:
             order_number = item.get('order_number', '번호 없음')
             swatch_name = item.get('swatch_name', '스와치명 없음')
             quantity = item.get('quantity', 0)
-            message += f"- {swatch_name} ({quantity}개) [주문번호: {order_number}]\n"
+            
+            # created_at 정보를 주문번호 옆에 추가
+            created_at = item.get('created_at', '')
+            if created_at:
+                # created_at 날짜 포맷팅 (YYYY-MM-DDTHH:MM:SS+TZ -> YYYY-MM-DD HH:MM)
+                if "T" in created_at:
+                    date_part, time_part = created_at.split("T")
+                    time_part = time_part.split("+")[0].split("Z")[0]  # 타임존 제거
+                    if ":" in time_part:
+                        hour_min = ":".join(time_part.split(":")[:2])  # HH:MM만 추출
+                        created_at_formatted = f"{date_part} {hour_min}"
+                    else:
+                        created_at_formatted = date_part
+                else:
+                    # T가 없는 경우 그대로 사용하되 길이 제한
+                    created_at_formatted = created_at[:16] if len(created_at) >= 16 else created_at
+                
+                message += f"- {swatch_name} ({quantity}개) [주문번호: {order_number} ({created_at_formatted} 주문)]\n"
+            else:
+                message += f"- {swatch_name} ({quantity}개) [주문번호: {order_number}]\n"
         
         message += "\n"
         

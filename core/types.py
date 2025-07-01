@@ -94,4 +94,13 @@ class StyleData(TypedDict, total=False):
     margin: str
     font_family: str
     font_size: str
-    font_weight: str 
+    font_weight: str
+
+# 발주 상태 한글 매핑
+PURCHASE_STATUS_LABELS = {
+    "requested": "발주요청중",
+    "confirmed": "발주확정",
+    "delivery_requested": "출고요청",
+    "cancelled": "발주취소",
+    # 필요시 추가
+} 

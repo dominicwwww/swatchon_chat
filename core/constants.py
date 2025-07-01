@@ -63,7 +63,13 @@ API_FIELDS = {
     "DELIVERY_METHOD": "delivery_method",
     "LOGISTICS_COMPANY": "logistics_company",
     "STATUS": "status",
-    "MESSAGE_STATUS": "message_status"
+    "MESSAGE_STATUS": "message_status",
+    "PRICE": "price",
+    "UNIT_PRICE": "unit_price",
+    "UNIT_PRICE_ORIGIN": "unit_price_origin",
+    "ADDITIONAL_INFO": "additional_info",
+    "CREATED_AT": "created_at",
+    "UPDATED_AT": "updated_at"
 }
 
 # 주문 상세 정보 기본 형식
@@ -188,7 +194,8 @@ API_ENDPOINTS = {
     "purchase_products": "/purchase_products",
     "shipment_requests": "/shipment_requests",
     "shipment_confirmations": "/shipment_confirmations",
-    "pickup_requests": "/pickup_requests"
+    "pickup_requests": "/pickup_requests",
+    "purchase_confirms": "/purchase_products"
 }
 
 # API 헤더
@@ -222,10 +229,11 @@ TABLE_COLUMN_NAMES = {
     "store_url": "판매자URL",
     "store_address": "판매자주소",
     "store_ddm_address": "동대문주소",
-    "quality_name": "퀄리티",
-    "quality_url": "퀄리티URL",
+    "quality_name": "QL",
+    "quality_url": "QLURL",
+    "quality_code": "QL코드",
     "swatch_pickupable": "스와치픽업",
-    "swatch_storage": "스와치보관",
+    "swatch_storage": "스와치보관함",
     "color_number": "컬러순서",
     "color_code": "컬러코드",
     "quantity": "수량(yd)",
@@ -239,5 +247,49 @@ TABLE_COLUMN_NAMES = {
     "logistics_company": "택배사",
     "status": "발주상태",
     "message_status": "메시지상태",
-    "processed_at": "처리시각"
+    "processed_at": "처리시각",
+    "price": "총가격",
+    "unit_price": "단가",
+    "unit_price_origin": "원본단가",
+    "additional_info": "메모",
+    "created_at": "생성시각",
+    "updated_at": "수정시각"
+}
+
+# 메시지 상태 한글 매핑
+MESSAGE_STATUS_LABELS = {
+    "pending": "대기중",
+    "requested": "발주요청중",
+    "sending": "전송중",
+    "sent": "전송완료",
+    "failed": "실패",
+    "cancelled": "취소됨",
+    "retry": "재시도"
+}
+
+# 테이블 공통 표시 설정
+TABLE_DISPLAY_CONFIG = {
+    # O/X 표시 설정
+    "BOOLEAN_TRUE_TEXT": "O",
+    "BOOLEAN_FALSE_TEXT": "✗",
+    "EMPTY_TEXT": "✗",
+    
+    # 색상 설정 (테마 색상 키)
+    "BOOLEAN_TRUE_COLOR": "success",  # 초록색
+    "BOOLEAN_FALSE_COLOR": "error",   # 빨간색
+    "EMPTY_COLOR": "error",           # 빨간색
+    
+    # 빈 값으로 처리할 조건들
+    "EMPTY_VALUES": [None, "", "null", "NULL"],
+    "FALSE_VALUES": [False, "false", "False", "FALSE", 0, "0"]
+}
+
+# 스와치픽업 관련 설정
+SWATCH_PICKUP_CONFIG = {
+    "TRUE_DISPLAY": TABLE_DISPLAY_CONFIG["BOOLEAN_TRUE_TEXT"],
+    "FALSE_DISPLAY": TABLE_DISPLAY_CONFIG["BOOLEAN_FALSE_TEXT"],
+    "NULL_DISPLAY": TABLE_DISPLAY_CONFIG["EMPTY_TEXT"],
+    "TRUE_COLOR": TABLE_DISPLAY_CONFIG["BOOLEAN_TRUE_COLOR"],
+    "FALSE_COLOR": TABLE_DISPLAY_CONFIG["BOOLEAN_FALSE_COLOR"],
+    "NULL_COLOR": TABLE_DISPLAY_CONFIG["EMPTY_COLOR"]
 } 

@@ -225,9 +225,29 @@ class MessageManager(QObject):
                     
                     order_details_lines.append(order_details_line)
                     
-                # 주문별 블록 생성 (주문번호 + 상품 목록)
+                # 주문별 블록 생성 (주문번호 + created_at + 상품 목록)
                 if order_details_lines:
-                    block = f"{order_idx}. {order_number}\n" + "\n".join([f"    {prod_idx}) {line}" for prod_idx, line in enumerate(order_details_lines, 1)])
+                    # created_at 정보를 발주번호 옆에 추가
+                    created_at = unique_products[0].get("created_at", "") if unique_products else ""
+                    if created_at:
+                        # created_at 날짜 포맷팅 (YYYY-MM-DDTHH:MM:SS+TZ -> YYYY-MM-DD HH:MM)
+                        if "T" in created_at:
+                            date_part, time_part = created_at.split("T")
+                            time_part = time_part.split("+")[0].split("Z")[0]  # 타임존 제거
+                            if ":" in time_part:
+                                hour_min = ":".join(time_part.split(":")[:2])  # HH:MM만 추출
+                                created_at_formatted = f"{date_part} {hour_min}"
+                            else:
+                                created_at_formatted = date_part
+                        else:
+                            # T가 없는 경우 그대로 사용하되 길이 제한
+                            created_at_formatted = created_at[:16] if len(created_at) >= 16 else created_at
+                        
+                        order_header = f"{order_idx}. {order_number} ({created_at_formatted} 주문)"
+                    else:
+                        order_header = f"{order_idx}. {order_number}"
+                    
+                    block = order_header + "\n" + "\n".join([f"    {prod_idx}) {line}" for prod_idx, line in enumerate(order_details_lines, 1)])
                 else:
                     # 상품이 없는 경우에도 주문번호는 표시
                     block = f"{order_idx}. {order_number}\n    (상품 정보 없음)"

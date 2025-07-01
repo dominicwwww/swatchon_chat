@@ -79,14 +79,16 @@ class MaintenanceFeeTable(QTableWidget):
         self.setSortingEnabled(True)  # 헤더 클릭 정렬 활성화
         
         # 컬럼 정의
-        self.setColumnCount(6)
+        self.setColumnCount(8)
         self.setHorizontalHeaderLabels([
             "",  # 체크박스 컬럼
             "날짜",
             "호수",
+            "파일명",
             "공급가액",
             "부가세",
-            "합계"
+            "합계",
+            "상태"
         ])
         
         # 컬럼 너비 설정
@@ -94,9 +96,11 @@ class MaintenanceFeeTable(QTableWidget):
         header.setSectionResizeMode(0, QHeaderView.ResizeToContents)  # 체크박스
         header.setSectionResizeMode(1, QHeaderView.ResizeToContents)  # 날짜
         header.setSectionResizeMode(2, QHeaderView.Stretch)           # 호수
-        header.setSectionResizeMode(3, QHeaderView.ResizeToContents)  # 공급가액
-        header.setSectionResizeMode(4, QHeaderView.ResizeToContents)  # 부가세
-        header.setSectionResizeMode(5, QHeaderView.ResizeToContents)  # 합계
+        header.setSectionResizeMode(3, QHeaderView.Stretch)           # 파일명
+        header.setSectionResizeMode(4, QHeaderView.ResizeToContents)  # 공급가액
+        header.setSectionResizeMode(5, QHeaderView.ResizeToContents)  # 부가세
+        header.setSectionResizeMode(6, QHeaderView.ResizeToContents)  # 합계
+        header.setSectionResizeMode(7, QHeaderView.ResizeToContents)  # 상태
         
         # 헤더 클릭 이벤트 연결
         self.horizontalHeader().sectionClicked.connect(self._on_header_clicked)
@@ -140,23 +144,47 @@ class MaintenanceFeeTable(QTableWidget):
                     unit_number = item.get('unit_number', '')
                     self.setItem(row_idx, 2, QTableWidgetItem(unit_number))
                     
+                    # 파일명
+                    file_name = item.get('file_name', '')
+                    self.setItem(row_idx, 3, QTableWidgetItem(file_name))
+                    
                     # 공급가액
                     supply_amount = item.get('supply_amount', 0)
                     supply_item = QTableWidgetItem(f"{supply_amount:,}원")
                     supply_item.setData(Qt.UserRole, supply_amount)  # 정렬을 위한 데이터
-                    self.setItem(row_idx, 3, supply_item)
+                    self.setItem(row_idx, 4, supply_item)
                     
                     # 부가세
                     vat_amount = item.get('vat_amount', 0)
                     vat_item = QTableWidgetItem(f"{vat_amount:,}원")
                     vat_item.setData(Qt.UserRole, vat_amount)  # 정렬을 위한 데이터
-                    self.setItem(row_idx, 4, vat_item)
+                    self.setItem(row_idx, 5, vat_item)
                     
                     # 합계
                     total_amount = supply_amount + vat_amount
                     total_item = QTableWidgetItem(f"{total_amount:,}원")
                     total_item.setData(Qt.UserRole, total_amount)  # 정렬을 위한 데이터
-                    self.setItem(row_idx, 5, total_item)
+                    self.setItem(row_idx, 6, total_item)
+                    
+                    # 상태
+                    status = item.get('status', '')
+                    status_item = QTableWidgetItem(status)
+                    
+                    # 상태에 따른 색상 설정
+                    if status == '성공':
+                        status_item.setBackground(QColor(200, 255, 200))  # 연한 초록색
+                        status_item.setForeground(QColor(0, 128, 0))      # 진한 초록색 텍스트
+                    elif status == '실패':
+                        status_item.setBackground(QColor(255, 200, 200))  # 연한 빨간색
+                        status_item.setForeground(QColor(128, 0, 0))      # 진한 빨간색 텍스트
+                    elif status == '진행중':
+                        status_item.setBackground(QColor(200, 200, 255))  # 연한 파란색
+                        status_item.setForeground(QColor(0, 0, 128))      # 진한 파란색 텍스트
+                    elif status == '대기중':
+                        status_item.setBackground(QColor(245, 245, 245))  # 연한 회색
+                        status_item.setForeground(QColor(128, 128, 128))  # 회색 텍스트
+                    
+                    self.setItem(row_idx, 7, status_item)
                     
                 except Exception as row_error:
                     print(f"행 처리 중 오류: {str(row_error)}")
@@ -189,9 +217,9 @@ class MaintenanceFeeTable(QTableWidget):
                         # 각 컬럼의 데이터 확인
                         date_item = self.item(row, 1)
                         unit_item = self.item(row, 2)
-                        supply_item = self.item(row, 3)
-                        vat_item = self.item(row, 4)
-                        total_item = self.item(row, 5)
+                        supply_item = self.item(row, 4)
+                        vat_item = self.item(row, 5)
+                        total_item = self.item(row, 6)
                         
                         if all([date_item, unit_item, supply_item, vat_item, total_item]):
                             selected_item = {
