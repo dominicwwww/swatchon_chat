@@ -16,7 +16,10 @@ from ui.theme import get_theme
 from ui.components.log_widget import LOG_INFO, LOG_WARNING, LOG_ERROR, LOG_DEBUG
 from ui.components.table import BaseTable
 from core.schemas import PurchaseProduct
-from core.constants import DELIVERY_METHODS, LOGISTICS_COMPANIES, TABLE_COLUMN_NAMES, API_FIELDS, MESSAGE_STATUS_LABELS, TABLE_DISPLAY_CONFIG
+from core.constants import (
+    DELIVERY_METHODS, LOGISTICS_COMPANIES, TABLE_COLUMN_NAMES, API_FIELDS, 
+    MESSAGE_STATUS_LABELS, TABLE_DISPLAY_CONFIG, apply_message_status_color
+)
 from core.types import ShipmentStatus
 
 class ShipmentRequestTable(BaseTable):
@@ -63,8 +66,8 @@ class ShipmentRequestTable(BaseTable):
         numeric_column_names = [TABLE_COLUMN_NAMES[API_FIELDS["ID"]], TABLE_COLUMN_NAMES[API_FIELDS["QUANTITY"]]]
         self.set_numeric_columns_by_names(numeric_column_names)
         
-        # 교대로 나타나는 행 색상 활성화
-        self.apply_alternating_row_colors(True)
+        # 교대로 나타나는 행 색상 비활성화 (메시지 상태별 배경색 우선시)
+        self.apply_alternating_row_colors(False)
         
         # 추가 컬럼 너비 조정 (선택적)
         header = self.horizontalHeader()
@@ -224,7 +227,7 @@ class ShipmentRequestTable(BaseTable):
         if store_url:
             self.set_cell_link(row_index, 3, store_url, show_link_style=True)
         elif not store_name:
-            self.set_cell_empty_style(row_index, 3)
+                self.set_cell_empty_style(row_index, 3)
         
         # 4. 동대문주소
         store_ddm_address = getattr(item, 'store_ddm_address', '')
@@ -340,22 +343,7 @@ class ShipmentRequestTable(BaseTable):
         self.setItem(row_index, 17, message_status_item)
         
         # 상태별 색상 적용
-        if message_status_text == ShipmentStatus.SENT.value:
-            self.set_cell_color(row_index, 17, QColor(212, 237, 218), QColor(21, 87, 36))
-        elif message_status_text == ShipmentStatus.FAILED.value:
-            self.set_cell_color(row_index, 17, QColor(248, 215, 218), QColor(114, 28, 36))
-        elif message_status_text == ShipmentStatus.SENDING.value:
-            self.set_cell_color(row_index, 17, QColor(255, 243, 205), QColor(133, 100, 4))
-        elif message_status_text == ShipmentStatus.CANCELLED.value:
-            self.set_cell_color(row_index, 17, QColor(233, 236, 239), QColor(73, 80, 87))
-        elif message_status_text == ShipmentStatus.RETRY.value:
-            self.set_cell_color(row_index, 17, QColor(217, 237, 247), QColor(12, 84, 96))
-        elif message_status_text == ShipmentStatus.PENDING.value:
-            # PENDING 상태는 테마 기본 색상 사용 (다크모드 고려)
-            theme = get_theme()
-            bg_color = QColor(theme.get_color("card_bg"))
-            text_color = QColor(theme.get_color("text_primary"))
-            self.set_cell_color(row_index, 17, bg_color, text_color)
+        apply_message_status_color(self, row_index, 17, message_status_text)
         
         # 18. 처리시각 (날짜 포맷팅)
         processed_at = getattr(item, 'processed_at', None)
@@ -402,25 +390,11 @@ class ShipmentRequestTable(BaseTable):
                         message_status_display = MESSAGE_STATUS_LABELS.get(message_status, message_status)
                         message_status_item = self._create_table_item(message_status_display, 17, message_status)
                         
-                        # 상태별 색상 적용
-                        if message_status == ShipmentStatus.SENT.value:
-                            self.set_cell_color(row, 17, QColor(212, 237, 218), QColor(21, 87, 36))
-                        elif message_status == ShipmentStatus.FAILED.value:
-                            self.set_cell_color(row, 17, QColor(248, 215, 218), QColor(114, 28, 36))
-                        elif message_status == ShipmentStatus.SENDING.value:
-                            self.set_cell_color(row, 17, QColor(255, 243, 205), QColor(133, 100, 4))
-                        elif message_status == ShipmentStatus.CANCELLED.value:
-                            self.set_cell_color(row, 17, QColor(233, 236, 239), QColor(73, 80, 87))
-                        elif message_status == ShipmentStatus.RETRY.value:
-                            self.set_cell_color(row, 17, QColor(217, 237, 247), QColor(12, 84, 96))
-                        elif message_status == ShipmentStatus.PENDING.value:
-                            # PENDING 상태는 테마 기본 색상 사용 (다크모드 고려)
-                            theme = get_theme()
-                            bg_color = QColor(theme.get_color("card_bg"))
-                            text_color = QColor(theme.get_color("text_primary"))
-                            self.set_cell_color(row, 17, bg_color, text_color)
-                        
+                        # 먼저 아이템을 설정한 후 색상 적용
                         self.setItem(row, 17, message_status_item)
+                        
+                        # 상태별 색상 적용
+                        apply_message_status_color(self, row, 17, message_status)
                         
                         # 처리시각 업데이트 (컬럼 18)
                         if processed_at:

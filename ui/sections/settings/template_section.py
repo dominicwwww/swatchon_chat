@@ -175,7 +175,7 @@ class TemplateSection(BaseSection):
         self.order_details_format.setPlaceholderText(
             "주문 상세 정보 형식을 설정하세요.\n\n"
             "기본 형식 예시:\n"
-            "[{quality_name}] | #{color_number} | {quantity}yd | {pickup_at} | {delivery_method}-{logistics_company}\n\n"
+            "[{quality_name}] | #{color_number} | {quantity}yd | {pickup_at} | {delivery_method}-{logistics_company}{swatch_request_note}\n\n"
             "사용 가능한 변수:\n" +
             f"- {{{API_FIELDS['ID']}}}: ID\n" +
             f"- {{{API_FIELDS['STORE_NAME']}}}: 판매자명\n" +
@@ -190,7 +190,8 @@ class TemplateSection(BaseSection):
             "- {order_index}: 주문 순서\n" +
             "- {total_orders}: 전체 주문 수\n" +
             "- {product_index}: 상품 순서\n" +
-            "- {total_products}: 전체 상품 수"
+            "- {total_products}: 전체 상품 수\n" +
+            "- {swatch_request_note}: 스와치 요청 안내 (조건부 자동 생성)"
         )
         order_details_layout.addWidget(self.order_details_format)
         edit_splitter.addWidget(order_details_group)
@@ -336,7 +337,7 @@ class TemplateSection(BaseSection):
     def _update_variables_display(self):
         """변수 목록 표시 업데이트"""
         api_vars = [f"{{{v}}}" for v in API_FIELDS.values()]
-        custom_vars = ["{order_index}", "{total_orders}", "{product_index}", "{total_products}", "{order_details}"]
+        custom_vars = ["{order_index}", "{total_orders}", "{product_index}", "{total_products}", "{order_details}", "{swatch_request_note}"]
         all_vars = api_vars + custom_vars
         
         # 변수를 그룹별로 정리
@@ -434,7 +435,7 @@ class TemplateSection(BaseSection):
         self.conditions_table.setRowCount(len(conditions))
         
         for row, condition in enumerate(conditions):
-            # 이전 형식 (field)과 새로운 형식 (fields) 모두 처리
+            # 필드 처리 (이전 형식과 새로운 형식 모두 처리)
             if "fields" in condition:
                 fields = condition["fields"]
                 if isinstance(fields, list):
@@ -444,6 +445,21 @@ class TemplateSection(BaseSection):
             else:
                 field_text = condition.get("field", "")
             
+            # 연산자 처리 (새로운 형식 지원)
+            if "operators" in condition:
+                operators = condition["operators"]
+                if isinstance(operators, dict):
+                    # 필드별 연산자가 다른 경우
+                    unique_ops = set(operators.values())
+                    if len(unique_ops) == 1:
+                        operator_text = list(unique_ops)[0]
+                    else:
+                        operator_text = ", ".join(f"{k}:{v}" for k, v in operators.items())
+                else:
+                    operator_text = str(operators)
+            else:
+                operator_text = condition.get("operator", "")
+            
             # 값 처리
             value = condition.get("value", "")
             if isinstance(value, dict):
@@ -451,14 +467,29 @@ class TemplateSection(BaseSection):
             else:
                 value_text = str(value)
             
+            # 템플릿/액션 처리
+            action_type = condition.get("action_type", "내용 추가")
+            # 기존 데이터 호환성을 위해 매핑
+            if action_type == "템플릿 내용 변경":
+                action_type = "내용 추가"
+            elif action_type == "템플릿 타입 변경":
+                action_type = "내용 변경"
+                
+            if action_type == "내용 변경":
+                template_content = condition.get("template", "")
+                template_text = f"[내용 변경] {template_content[:30]}..." if len(template_content) > 30 else f"[내용 변경] {template_content}"
+            else:
+                additional_content = condition.get("template", "")
+                template_text = f"[내용 추가] {additional_content[:30]}..." if len(additional_content) > 30 else f"[내용 추가] {additional_content}"
+            
             # 테이블 아이템 생성 및 원본 데이터 저장
             field_item = QTableWidgetItem(field_text)
             field_item.setData(Qt.UserRole, condition)  # 원본 조건 데이터 저장
             
             self.conditions_table.setItem(row, 0, field_item)
-            self.conditions_table.setItem(row, 1, QTableWidgetItem(condition.get("operator", "")))
+            self.conditions_table.setItem(row, 1, QTableWidgetItem(operator_text))
             self.conditions_table.setItem(row, 2, QTableWidgetItem(value_text))
-            self.conditions_table.setItem(row, 3, QTableWidgetItem(condition.get("template", "")))
+            self.conditions_table.setItem(row, 3, QTableWidgetItem(template_text))
     
     # 새로운 버튼 이벤트 핸들러들
     def _on_new_template_clicked(self):
@@ -497,10 +528,10 @@ class TemplateSection(BaseSection):
             condition = original_condition
         else:
             # 원본 데이터가 없으면 테이블 텍스트로 재구성 (fallback)
-            field_text = field_item.text() if field_item else ""
-            operator_text = self.conditions_table.item(current_row, 1).text() if self.conditions_table.item(current_row, 1) else ""
-            value_text = self.conditions_table.item(current_row, 2).text() if self.conditions_table.item(current_row, 2) else ""
-            template_text = self.conditions_table.item(current_row, 3).text() if self.conditions_table.item(current_row, 3) else ""
+            field_text = field_item.text().strip() if field_item else ""
+            operator_text = self.conditions_table.item(current_row, 1).text().strip() if self.conditions_table.item(current_row, 1) else ""
+            value_text = self.conditions_table.item(current_row, 2).text().strip() if self.conditions_table.item(current_row, 2) else ""
+            template_text = self.conditions_table.item(current_row, 3).text().strip() if self.conditions_table.item(current_row, 3) else ""
             
             condition = {
                 "field": field_text,
@@ -525,6 +556,21 @@ class TemplateSection(BaseSection):
         else:
             field_text = condition.get("field", "")
         
+        # 연산자 처리 (새로운 형식 지원)
+        if "operators" in condition:
+            operators = condition["operators"]
+            if isinstance(operators, dict):
+                # 필드별 연산자가 다른 경우
+                unique_ops = set(operators.values())
+                if len(unique_ops) == 1:
+                    operator_text = list(unique_ops)[0]
+                else:
+                    operator_text = ", ".join(f"{k}:{v}" for k, v in operators.items())
+            else:
+                operator_text = str(operators)
+        else:
+            operator_text = condition.get("operator", "")
+        
         # 값 처리
         value = condition.get("value", "")
         if isinstance(value, dict):
@@ -532,14 +578,29 @@ class TemplateSection(BaseSection):
         else:
             value_text = str(value)
         
+        # 템플릿/액션 처리
+        action_type = condition.get("action_type", "내용 추가")
+        # 기존 데이터 호환성을 위해 매핑
+        if action_type == "템플릿 내용 변경":
+            action_type = "내용 추가"
+        elif action_type == "템플릿 타입 변경":
+            action_type = "내용 변경"
+            
+        if action_type == "내용 변경":
+            template_content = condition.get("template", "")
+            template_text = f"[내용 변경] {template_content[:30]}..." if len(template_content) > 30 else f"[내용 변경] {template_content}"
+        else:
+            additional_content = condition.get("template", "")
+            template_text = f"[내용 추가] {additional_content[:30]}..." if len(additional_content) > 30 else f"[내용 추가] {additional_content}"
+        
         # 필드 아이템 생성 및 원본 데이터 저장
         field_item = QTableWidgetItem(field_text)
         field_item.setData(Qt.UserRole, condition)  # 원본 조건 데이터 저장
         
         self.conditions_table.setItem(row, 0, field_item)
-        self.conditions_table.setItem(row, 1, QTableWidgetItem(condition.get("operator", "")))
+        self.conditions_table.setItem(row, 1, QTableWidgetItem(operator_text))
         self.conditions_table.setItem(row, 2, QTableWidgetItem(value_text))
-        self.conditions_table.setItem(row, 3, QTableWidgetItem(condition.get("template", "")))
+        self.conditions_table.setItem(row, 3, QTableWidgetItem(template_text))
     
     def _on_refresh_data_clicked(self):
         """데이터 새로고침 버튼 클릭"""
@@ -759,18 +820,64 @@ class TemplateSection(BaseSection):
             )
 
             if message:
-                try:
-                    # 안전하게 텍스트 출력 (길이 체크 및 예외처리)
-                    self.preview_text.setPlainText("")
-                    doc = self.preview_text.document()
-                    cursor = self.preview_text.textCursor()
-                    pos = max(0, doc.characterCount() - 1)
-                    cursor.setPosition(pos)
-                    self.preview_text.setTextCursor(cursor)
-                    self.preview_text.insertPlainText(message)
-                except Exception as e:
-                    self.log(f"미리보기 결과 출력 중 오류: {e}", LOG_ERROR)
-                self.log(f"미리보기 생성 완료: {current_seller} 판매자", LOG_SUCCESS)
+                # 템플릿 타입 변경 액션인지 확인
+                if isinstance(message, dict) and message.get("action") == "change_template_type":
+                    target_operation = message["target_operation"]
+                    operation_map = {
+                        "shipment_request": "출고 요청",
+                        "shipment_confirm": "출고 확인",
+                        "po": "발주 확인 요청"
+                    }
+                    target_name = operation_map.get(target_operation, target_operation)
+                    
+                    # 대상 템플릿으로 다시 렌더링
+                    target_op_type = None
+                    if self._current_order_type == OrderType.FBO.value:
+                        if target_operation == "shipment_request":
+                            target_op_type = FboOperationType.SHIPMENT_REQUEST
+                        elif target_operation == "shipment_confirm":
+                            target_op_type = FboOperationType.SHIPMENT_CONFIRM
+                        elif target_operation == "po":
+                            target_op_type = FboOperationType.PO
+                    
+                    if target_op_type:
+                        final_message = self.template_service.render_message(
+                            OrderType(self._current_order_type),
+                            target_op_type,
+                            message["data"]
+                        )
+                        
+                        if final_message and isinstance(final_message, str):
+                            try:
+                                result_text = f"[조건 충족: {target_name}으로 템플릿 타입 변경]\n\n{final_message}"
+                                self.preview_text.setPlainText("")
+                                doc = self.preview_text.document()
+                                cursor = self.preview_text.textCursor()
+                                pos = max(0, doc.characterCount() - 1)
+                                cursor.setPosition(pos)
+                                self.preview_text.setTextCursor(cursor)
+                                self.preview_text.insertPlainText(result_text)
+                            except Exception as e:
+                                self.log(f"미리보기 결과 출력 중 오류: {e}", LOG_ERROR)
+                            self.log(f"미리보기 생성 완료 (타입 변경): {current_seller} 판매자 → {target_name}", LOG_SUCCESS)
+                        else:
+                            self.log("대상 템플릿 렌더링에 실패했습니다.", LOG_ERROR)
+                    else:
+                        self.log(f"지원하지 않는 대상 템플릿 타입: {target_operation}", LOG_ERROR)
+                else:
+                    # 일반 템플릿 렌더링 결과
+                    try:
+                        # 안전하게 텍스트 출력 (길이 체크 및 예외처리)
+                        self.preview_text.setPlainText("")
+                        doc = self.preview_text.document()
+                        cursor = self.preview_text.textCursor()
+                        pos = max(0, doc.characterCount() - 1)
+                        cursor.setPosition(pos)
+                        self.preview_text.setTextCursor(cursor)
+                        self.preview_text.insertPlainText(message)
+                    except Exception as e:
+                        self.log(f"미리보기 결과 출력 중 오류: {e}", LOG_ERROR)
+                    self.log(f"미리보기 생성 완료: {current_seller} 판매자", LOG_SUCCESS)
             else:
                 self.log("미리보기 생성에 실패했습니다.", LOG_ERROR)
                 QMessageBox.warning(self, "미리보기 실패", "미리보기 생성에 실패했습니다.")
@@ -794,61 +901,41 @@ class TemplateSection(BaseSection):
             self.log("제목과 내용을 모두 입력해주세요.", LOG_WARNING)
             return
         
-        # 조건 데이터 수집 (새로운 다중 필드 형식 지원)
+        # 조건 데이터 수집 (새로운 다중 필드 형식 우선 지원)
         conditions = []
         for row in range(self.conditions_table.rowCount()):
             field_item = self.conditions_table.item(row, 0)
-            operator_item = self.conditions_table.item(row, 1)
-            value_item = self.conditions_table.item(row, 2)
-            template_item = self.conditions_table.item(row, 3)
             
-            if field_item and operator_item and value_item:
-                field_text = field_item.text().strip()
-                operator_text = operator_item.text().strip()
-                value_text = value_item.text().strip()
-                template_text = template_item.text() if template_item else ""
+            if field_item:
+                # 원본 조건 데이터가 있는지 확인 (Qt.UserRole에 저장된 데이터)
+                original_condition = field_item.data(Qt.UserRole)
                 
-                # 필드가 여러 개인지 확인 (쉼표로 구분된 경우)
-                if ',' in field_text:
-                    # 다중 필드 형식
-                    fields = [f.strip() for f in field_text.split(',') if f.strip()]
-                    
-                    # 값이 "field: value" 형식인지 확인
-                    if ':' in value_text:
-                        # "field1: value1, field2: value2" 형식 파싱
-                        field_values = {}
-                        for pair in value_text.split(','):
-                            if ':' in pair:
-                                k, v = pair.split(':', 1)
-                                field_values[k.strip()] = v.strip()
-                            else:
-                                # 모든 필드에 같은 값 적용
-                                for field in fields:
-                                    field_values[field] = pair.strip()
-                    else:
-                        # 모든 필드에 같은 값 적용
-                        field_values = {field: value_text for field in fields}
-                    
-                    condition = {
-                        "fields": fields,
-                        "operator": operator_text,
-                        "value": field_values,
-                        "template": template_text
-                    }
+                if original_condition and isinstance(original_condition, dict):
+                    # 원본 데이터가 있으면 그대로 사용 (ConditionDialog에서 생성한 완전한 데이터)
+                    conditions.append(original_condition)
+                    self.log(f"원본 조건 데이터 사용: {original_condition.get('fields', ['Unknown'])}", LOG_DEBUG)
                 else:
-                    # 단일 필드 형식 (기존 방식과 호환)
-                    if field_text:
-                        condition = {
-                            "field": field_text,
-                            "operator": operator_text,
-                            "value": value_text,
-                            "template": template_text
-                        }
-                    else:
-                        # 필드가 비어있으면 건너뛰기
-                        continue
-                
-                conditions.append(condition)
+                    # 원본 데이터가 없는 경우에만 테이블에서 수집 (하위 호환성)
+                    operator_item = self.conditions_table.item(row, 1)
+                    value_item = self.conditions_table.item(row, 2)
+                    template_item = self.conditions_table.item(row, 3)
+                    
+                    if operator_item and value_item:
+                        field_text = field_item.text().strip()
+                        operator_text = operator_item.text().strip()
+                        value_text = value_item.text().strip()
+                        template_text = template_item.text() if template_item else ""
+                        
+                        if field_text:
+                            # 기존 단일 필드 형식으로 변환
+                            condition = {
+                                "field": field_text,
+                                "operator": operator_text,
+                                "value": value_text,
+                                "template": template_text
+                            }
+                            conditions.append(condition)
+                            self.log(f"테이블에서 조건 데이터 수집: {field_text}", LOG_DEBUG)
         
         try:
             # 템플릿 서비스에 저장
@@ -862,7 +949,7 @@ class TemplateSection(BaseSection):
             )
             
             if success:
-                self.log("템플릿이 저장되었습니다.", LOG_SUCCESS)
+                self.log(f"템플릿이 저장되었습니다. 조건 개수: {len(conditions)}", LOG_SUCCESS)
                 QMessageBox.information(self, "저장 완료", "템플릿이 성공적으로 저장되었습니다.")
             else:
                 self.log("템플릿 저장에 실패했습니다.", LOG_ERROR)

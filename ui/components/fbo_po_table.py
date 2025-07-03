@@ -9,7 +9,8 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor, QFont, QIcon
 from ui.components.table import BaseTable
 from ui.theme import get_theme
-from core.constants import TABLE_COLUMN_NAMES, MESSAGE_STATUS_LABELS
+from core.constants import TABLE_COLUMN_NAMES, MESSAGE_STATUS_LABELS, apply_message_status_color
+from core.types import ShipmentStatus
 
 class FboPoTable(BaseTable):
     selection_changed = Signal(list)  # 선택된 항목 변경 시그널
@@ -65,7 +66,7 @@ class FboPoTable(BaseTable):
         self.setSelectionMode(BaseTable.SingleSelection)
         self.setEditTriggers(BaseTable.NoEditTriggers)
         self.setSortingEnabled(True)  # 정렬 기능 활성화
-        self.apply_alternating_row_colors(True)
+        self.apply_alternating_row_colors(False)  # 메시지 상태별 배경색 우선시
         
         # 추가 컬럼 너비 조정 (선택적)
         header = self.horizontalHeader()
@@ -103,6 +104,15 @@ class FboPoTable(BaseTable):
             # 메시지 상태는 별도 처리 (빈 값이 아닌 경우만)
             if field_name == "message_status" and not is_empty:
                 formatted_value = MESSAGE_STATUS_LABELS.get(str(raw_value), str(raw_value))
+                
+                # 적절한 테이블 아이템 생성
+                item = self._create_table_item(formatted_value, col, raw_value)
+                self.setItem(row_index, col, item)
+                
+                # 상태별 배경색 적용
+                apply_message_status_color(self, row_index, col, str(raw_value))
+                
+                continue  # 이미 아이템을 설정했으므로 다음 필드로
             
             # 스와치픽업 필드는 공통 불린 처리 사용
             if field_name == "swatch_pickupable":
@@ -237,27 +247,27 @@ class FboPoTable(BaseTable):
                     message_status_col = self.field_names.index("message_status") + 1
                     processed_at_col = self.field_names.index("processed_at") + 1
                     
-                    # 메시지 상태 컬럼 업데이트
-                    status_item = self.item(row, message_status_col)
-                    if status_item:
-                        # 한글 상태로 변환
-                        korean_status = MESSAGE_STATUS_LABELS.get(status, status)
-                        status_item.setText(korean_status)
+                    # 메시지 상태 컬럼 업데이트 - 새로운 아이템 생성
+                    korean_status = MESSAGE_STATUS_LABELS.get(status, status)
+                    status_item = self._create_table_item(korean_status, message_status_col, status)
+                    self.setItem(row, message_status_col, status_item)
+                    
+                    # 상태별 배경색 적용
+                    apply_message_status_color(self, row, message_status_col, status)
                     
                     # 처리시각 컬럼 업데이트 (제공된 경우)
                     if processed_at:
-                        processed_item = self.item(row, processed_at_col)
-                        if processed_item:
-                            # 날짜/시간 포맷팅
-                            formatted_time = self.format_datetime(processed_at) if hasattr(self, 'format_datetime') else processed_at
-                            processed_item.setText(formatted_time)
+                        # 날짜/시간 포맷팅
+                        formatted_time = self.format_datetime(processed_at) if hasattr(self, 'format_datetime') else processed_at
+                        processed_item = self._create_table_item(formatted_time, processed_at_col, processed_at)
+                        self.setItem(row, processed_at_col, processed_item)
                     
                 except ValueError as e:
                     # 필드명을 찾을 수 없는 경우 기존 방식 사용
-                    status_item = self.item(row, 14)  # 기존 하드코딩된 인덱스
-                    if status_item:
-                        korean_status = MESSAGE_STATUS_LABELS.get(status, status)
-                        status_item.setText(korean_status)
+                    korean_status = MESSAGE_STATUS_LABELS.get(status, status)
+                    status_item = self._create_table_item(korean_status, 14, status)
+                    self.setItem(row, 14, status_item)
+                    apply_message_status_color(self, row, 14, status)
                 break
 
     def get_all_data(self):

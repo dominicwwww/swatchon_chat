@@ -81,7 +81,6 @@ class BaseTable(QTableWidget):
         self.setStyleSheet(f"""
             QTableWidget {{
                 background-color: {theme.get_color("card_bg")};
-                alternate-background-color: {theme.get_color("background")};
                 gridline-color: {theme.get_color("border")};
                 border: 1px solid {theme.get_color("border")};
                 border-radius: 4px;
@@ -92,17 +91,20 @@ class BaseTable(QTableWidget):
             QTableWidget::item {{
                 padding: 4px;
                 border: none;
-                /* 배경색과 텍스트 색상 제거 - 개별 아이템 색상이 우선되도록 */
+                /* 개별 아이템의 배경색과 텍스트 색상 강제 적용 방지 */
+                /* background-color와 color 속성 제거하여 개별 설정 우선시 */
             }}
             
             QTableWidget::item:selected {{
-                background-color: {theme.get_color("primary")};
-                color: white;
+                /* 선택된 아이템만 스타일 적용 */
+                background-color: {theme.get_color("primary")} !important;
+                color: white !important;
             }}
             
             QTableWidget::item:hover:!selected {{
-                background-color: {theme.get_color("sidebar_bg")};
-                /* hover 시에도 텍스트 색상은 개별 설정 유지 */
+                /* hover 시에는 배경색 변경하지 않고 약간의 효과만 */
+                border: 1px solid {theme.get_color("primary")};
+                /* 개별 설정된 배경색과 텍스트 색상 유지 */
             }}
             
             QHeaderView::section {{
@@ -452,17 +454,32 @@ class BaseTable(QTableWidget):
         return selected_items
     
     def set_cell_color(self, row: int, col: int, background_color: QColor, text_color: QColor):
-        """셀 색상 설정 (강화된 버전)"""
+        """셀 색상 설정 (강화된 버전 - 배경색 우선 적용)"""
         if 0 <= row < self.rowCount() and 0 <= col < self.columnCount():
             item = self.item(row, col)
             if item:
-                # 배경색과 전경색 설정
+                # 배경색과 전경색 설정 (여러 방법으로 강력하게 적용)
                 item.setBackground(QBrush(background_color))
                 item.setForeground(QBrush(text_color))
                 
                 # 더 강력한 색상 적용을 위해 데이터로도 저장
                 item.setData(Qt.UserRole + 1, background_color.name())
                 item.setData(Qt.UserRole + 2, text_color.name())
+                
+                # 개별 셀에 인라인 스타일 적용 (가장 강력한 방법)
+                from PySide6.QtCore import QModelIndex
+                from PySide6.QtWidgets import QStyledItemDelegate
+                
+                # 셀의 인덱스를 가져와서 직접 스타일 설정
+                index = self.model().index(row, col)
+                if index.isValid():
+                    # 백그라운드 롤과 포그라운드 롤 직접 설정
+                    self.model().setData(index, QBrush(background_color), Qt.BackgroundRole)
+                    self.model().setData(index, QBrush(text_color), Qt.ForegroundRole)
+                
+                # 아이템의 display role도 확실히 설정
+                item.setData(Qt.BackgroundRole, QBrush(background_color))
+                item.setData(Qt.ForegroundRole, QBrush(text_color))
     
     def set_cell_theme_color(self, row: int, col: int, bg_color_name: str, text_color_name: str):
         """테마 색상으로 셀 색상 설정"""
@@ -551,8 +568,15 @@ class BaseTable(QTableWidget):
                 item.setToolTip("")
     
     def apply_alternating_row_colors(self, enable: bool = True):
-        """교대로 나타나는 행 색상 활성화/비활성화"""
-        self.setAlternatingRowColors(enable)
+        """교대로 나타나는 행 색상 활성화/비활성화 (개별 셀 색상과 충돌 방지)"""
+        # 개별 셀에 색상이 적용된 경우 교대 색상이 덮어쓰지 않도록 확실히 비활성화
+        # 메시지 상태별 배경색을 우선시하기 위해 기본적으로 비활성화
+        self.setAlternatingRowColors(False)
+        
+        # Qt의 내부 플래그도 확실히 설정
+        if hasattr(self, 'model') and self.model():
+            # 모델에서도 교대 색상 비활성화
+            self.model().setProperty("alternatingRowColors", False)
     
     def mousePressEvent(self, event):
         """마우스 클릭 이벤트 처리"""
@@ -708,14 +732,14 @@ class BaseTable(QTableWidget):
             # 일반 컬럼인 경우 기본 QTableWidgetItem 사용
             item = QTableWidgetItem(text)
         
-        # 기본 색상 명시적으로 설정 (매우 중요!)
+        # 기본 텍스트 색상만 설정 (배경색은 설정하지 않음 - 나중에 적용하는 색상이 제대로 보이도록)
         theme = get_theme()
         default_color = QColor(theme.get_color("text_primary"))
         item.setForeground(QBrush(default_color))
         
-        # 기본 배경색도 설정
-        default_bg = QColor(theme.get_color("card_bg"))
-        item.setBackground(QBrush(default_bg))
+        # 기본 배경색은 설정하지 않음 - 개별 색상 적용이 제대로 작동하도록
+        # default_bg = QColor(theme.get_color("card_bg"))
+        # item.setBackground(QBrush(default_bg))
         
         return item
     

@@ -49,14 +49,50 @@
         ],
         "conditions": [
           {
-            "field": "pickup_at",
-            "operator": "<",
-            "value": "{today}",
-            "template": "[출고 확인-{store_name}]\n안녕하세요!\n출고일이 지났지만 아직 물류센터에 입고 되지 않아 출고 여부 확인 부탁 드립니다.\n\n{order_details}\n\nhttps://partners.swatchon.com/purchases/products/need-sent?page=1"
+            "action_type": "내용 추가",
+            "fields": [
+              "swatch_storage",
+              "swatch_pickupable"
+            ],
+            "operators": {
+              "swatch_pickupable": "==",
+              "swatch_storage": "is_null"
+            },
+            "template": "[스와치 재고 X] \n{swatch_no_stock}\n\n* 컬러 확인/재고 산입 위해 스와치 3부 동봉 가능할까요?",
+            "value": {
+              "swatch_pickupable": "True",
+              "swatch_storage": ""
+            }
+          },
+          {
+            "action_type": "내용 변경",
+            "fields": [
+              "pickup_at"
+            ],
+            "operators": {
+              "pickup_at": "<"
+            },
+            "template": "[출고 확인-{store_name}]\n안녕하세요!\n출고일이 지났지만 입고가 되지 않아 확인 부탁 드립니다.\n\n{order_details}\n\n[주문]>[출고예정] 링크:\nhttps://partners.swatchon.com/purchases/products/need-sent?page=1",
+            "value": {
+              "pickup_at": "{today}"
+            }
+          },
+          {
+            "action_type": "내용 추가",
+            "fields": [
+              "delivery_method"
+            ],
+            "operators": {
+              "delivery_method": "=="
+            },
+            "template": "*픽업 시각 조율 필요하신 경우 기사님께 연락 부탁 드립니다.\n동대문 픽업 기사님: 010-2474-1775",
+            "value": {
+              "delivery_method": "quick"
+            }
           }
         ],
         "order_details_format": "[{quality_name}] | 컬러코드 #{color_code} | 컬러순서 #{color_number} | {quantity}yd | {pickup_at} | {delivery_method}-{logistics_company}",
-        "last_modified": "2025-06-27T11:30:39.104199"
+        "last_modified": "2025-07-03T12:23:00.060280"
       },
       "shipment_confirm": {
         "title": "FBO 출고 확인",

@@ -267,6 +267,108 @@ MESSAGE_STATUS_LABELS = {
     "retry": "재시도"
 }
 
+# 메시지 상태별 색상 설정 (한글 상태 값 기준)
+MESSAGE_STATUS_COLORS = {
+    "대기중": {
+        "background": (255, 218, 185),  # 밝은 주황색
+        "text": (255, 140, 0)           # 진한 주황색
+    },
+    "전송중": {
+        "background": (255, 255, 0),    # 밝은 노란색
+        "text": (139, 69, 19)           # 갈색
+    },
+    "전송완료": {
+        "background": (144, 238, 144),  # 밝은 초록색
+        "text": (0, 100, 0)             # 진한 초록색
+    },
+    "전송실패": {
+        "background": (255, 182, 193),  # 밝은 빨간색
+        "text": (139, 0, 0)             # 진한 빨간색
+    },
+    "취소됨": {
+        "background": (211, 211, 211),  # 밝은 회색
+        "text": (105, 105, 105)         # 진한 회색
+    },
+    "재시도대기": {
+        "background": (173, 216, 230),  # 밝은 파란색
+        "text": (0, 0, 139)             # 진한 파란색
+    },
+    # 영어 키도 지원 (하위 호환성)
+    "pending": {
+        "background": (255, 218, 185),  # 밝은 주황색
+        "text": (255, 140, 0)           # 진한 주황색
+    },
+    "sending": {
+        "background": (255, 255, 0),    # 밝은 노란색
+        "text": (139, 69, 19)           # 갈색
+    },
+    "sent": {
+        "background": (144, 238, 144),  # 밝은 초록색
+        "text": (0, 100, 0)             # 진한 초록색
+    },
+    "failed": {
+        "background": (255, 182, 193),  # 밝은 빨간색
+        "text": (139, 0, 0)             # 진한 빨간색
+    },
+    "cancelled": {
+        "background": (211, 211, 211),  # 밝은 회색
+        "text": (105, 105, 105)         # 진한 회색
+    },
+    "retry": {
+        "background": (173, 216, 230),  # 밝은 파란색
+        "text": (0, 0, 139)             # 진한 파란색
+    }
+}
+
+def apply_message_status_color(table_instance, row: int, col: int, status: str):
+    """
+    메시지 상태에 따라 셀 색상을 적용하는 공통 함수
+    
+    Args:
+        table_instance: 테이블 인스턴스 (set_cell_color 메서드가 있어야 함)
+        row: 행 인덱스
+        col: 열 인덱스  
+        status: 메시지 상태 값
+    """
+    try:
+        from PySide6.QtGui import QColor, QBrush
+        from PySide6.QtCore import Qt
+        
+        color_config = MESSAGE_STATUS_COLORS.get(status)
+        if color_config:
+            bg_rgb = color_config["background"]
+            text_rgb = color_config["text"]
+            
+            bg_color = QColor(bg_rgb[0], bg_rgb[1], bg_rgb[2])
+            text_color = QColor(text_rgb[0], text_rgb[1], text_rgb[2])
+            
+            # 테이블 아이템 가져오기
+            item = table_instance.item(row, col)
+            if item:
+                # 직접적이고 강력한 방법으로 색상 적용
+                item.setBackground(QBrush(bg_color))
+                item.setForeground(QBrush(text_color))
+                
+                # Qt의 데이터 역할을 통해서도 설정 (더 강력함)
+                item.setData(Qt.BackgroundRole, QBrush(bg_color))
+                item.setData(Qt.ForegroundRole, QBrush(text_color))
+                
+                # 모델을 통해서도 직접 설정 (스타일시트 우회)
+                model = table_instance.model()
+                if model:
+                    index = model.index(row, col)
+                    if index.isValid():
+                        model.setData(index, QBrush(bg_color), Qt.BackgroundRole)
+                        model.setData(index, QBrush(text_color), Qt.ForegroundRole)
+                
+                # 강제로 테이블 업데이트
+                table_instance.viewport().update()
+                
+    except Exception as e:
+        # 색상 적용 실패 시 콘솔에 에러 출력 (디버깅용)
+        print(f"색상 적용 실패 - 행: {row}, 열: {col}, 상태: {status}, 에러: {e}")
+        pass
+
 # 테이블 공통 표시 설정
 TABLE_DISPLAY_CONFIG = {
     # O/X 표시 설정

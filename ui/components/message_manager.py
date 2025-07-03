@@ -314,7 +314,8 @@ class MessageManager(QObject):
                         "order_details": order_details,
                         "pickup_at": seller_items_copy[0].get("pickup_at", ""),
                         "total_orders": len(set(item.get("purchase_code", "") for item in seller_items_copy)),
-                        "total_products": len(seller_items_copy)
+                        "total_products": len(seller_items_copy),
+                        "items": seller_items_copy  # 개별 아이템 리스트 추가
                     }
                     
                     # 기본 API 필드 추가

@@ -42,6 +42,7 @@ class ShipmentRequestSection(BaseSection):
         self.refresh_button = self.add_header_button("새로고침", self._on_refresh_clicked)
         self.refresh_address_button = self.add_header_button("주소록 새로고침", self._on_refresh_address_clicked)
         self.preview_button = self.add_header_button("📋 메시지 미리보기", self._on_preview_clicked, primary=True)
+        self.message_log_button = self.add_header_button("📄 메시지 로그 출력", self._on_message_log_clicked)
         self.send_button = self.add_header_button("💌 메시지 전송", self._on_send_clicked)
         self.emergency_stop_button = self.add_header_button("🛑 긴급 정지", self._on_emergency_stop_clicked)
         
@@ -69,6 +70,7 @@ class ShipmentRequestSection(BaseSection):
         
         # 초기 버튼 상태 설정
         self.send_button.setEnabled(False)
+        self.message_log_button.setEnabled(False)
         self.emergency_stop_button.setEnabled(False)
         
         # UI 설정
@@ -178,6 +180,7 @@ class ShipmentRequestSection(BaseSection):
         """메시지 미리보기 생성 완료 이벤트"""
         self.log("메시지 미리보기가 생성되었습니다.", LOG_SUCCESS)
         self.send_button.setEnabled(True)
+        self.message_log_button.setEnabled(True)
         self.preview_button.setText("📋 메시지 미리보기")
         self.log("💡 '메시지 전송' 버튼을 클릭하여 실제 전송하거나, 다른 항목을 선택하여 새로운 미리보기를 생성하세요.", LOG_INFO)
         
@@ -371,11 +374,13 @@ class ShipmentRequestSection(BaseSection):
             
             # 미리보기 상태 초기화
             self.send_button.setEnabled(False)
+            self.message_log_button.setEnabled(False)
             self.preview_button.setText("📋 메시지 미리보기")
             self.message_manager.clear_preview_data()
         else:
             self.log("선택된 항목이 없습니다.", LOG_INFO)
             self.send_button.setEnabled(False)
+            self.message_log_button.setEnabled(False)
             self.preview_button.setText("📋 메시지 미리보기")
     
     def _on_refresh_clicked(self):
@@ -595,6 +600,83 @@ class ShipmentRequestSection(BaseSection):
             self.message_manager.emergency_stop()
             self.emergency_stop_button.setEnabled(False)
     
+    def _on_message_log_clicked(self):
+        """메시지 로그 출력 버튼 클릭 이벤트"""
+        if not self.message_manager.get_preview_data():
+            QMessageBox.warning(self, "로그 출력 오류", "먼저 미리보기를 생성해주세요.")
+            return
+        
+        # 로그에 카카오톡 메시지 출력
+        self._log_kakao_messages()
+    
+    def _log_kakao_messages(self):
+        """로그에 카카오톡 메시지 출력"""
+        preview_data = self.message_manager.get_preview_data()
+        
+        # 실제 데이터 구조 확인
+        self.log(f"Preview data keys: {list(preview_data.keys()) if preview_data else 'None'}", LOG_DEBUG)
+        
+        if not preview_data:
+            self.log("미리보기 데이터가 없습니다.", LOG_WARNING)
+            return
+        
+        # 다양한 키 형태 확인
+        store_messages = None
+        if 'store_messages' in preview_data:
+            store_messages = preview_data['store_messages']
+        elif 'messages' in preview_data:
+            store_messages = preview_data['messages']
+        else:
+            # 미리보기 데이터가 직접 판매자별 메시지일 수도 있음
+            store_messages = []
+            for key, value in preview_data.items():
+                if isinstance(value, dict) and 'message' in value:
+                    store_messages.append({
+                        'store_name': key,
+                        'message': value['message']
+                    })
+                elif isinstance(value, str):
+                    # 키가 판매자명이고 값이 메시지인 경우
+                    store_messages.append({
+                        'store_name': key,
+                        'message': value
+                    })
+        
+        if not store_messages:
+            self.log("전송할 메시지가 없습니다.", LOG_WARNING)
+            self.log(f"사용 가능한 데이터: {preview_data}", LOG_DEBUG)
+            return
+        
+        self.log("\n" + "=" * 60, LOG_INFO)
+        self.log("📱 카카오톡 메시지 로그", LOG_INFO)
+        self.log("=" * 60, LOG_INFO)
+        self.log(f"총 {len(store_messages)}개 판매자에게 전송될 메시지\n", LOG_INFO)
+        
+        for i, store_msg in enumerate(store_messages, 1):
+            store_name = store_msg.get('store_name', f'판매자{i}')
+            message = store_msg.get('message', '메시지 없음')
+            
+            self.log(f"[{i}/{len(store_messages)}] 📤 {store_name}", LOG_INFO)
+            self.log("-" * 40, LOG_INFO)
+            self.log(f"제목: [출고 요청-{store_name}]", LOG_INFO)
+            self.log("메시지 내용:", LOG_INFO)
+            self.log("┌" + "─" * 50 + "┐", LOG_INFO)
+            
+            # 메시지 내용을 줄별로 출력
+            message_lines = message.strip().split('\n')
+            for line in message_lines:
+                if line.strip():
+                    # 전체 메시지를 모두 표시
+                    self.log(f"│ {line.strip()}", LOG_INFO)
+                else:
+                    self.log("│", LOG_INFO)
+            
+            self.log("└" + "─" * 50 + "┘", LOG_INFO)
+            self.log("", LOG_INFO)  # 빈 줄
+        
+        self.log("=" * 60, LOG_INFO)
+        self.log("📱 카카오톡 메시지 로그 완료", LOG_SUCCESS)
+    
     def _update_item_status(self, item_ids: List[int], status: str, set_processed_time: bool = False):
         """항목 상태 업데이트 콜백"""
         try:
@@ -697,6 +779,7 @@ class ShipmentRequestSection(BaseSection):
         """전송 버튼 상태 초기화"""
         try:
             self.send_button.setEnabled(False)
+            self.message_log_button.setEnabled(False)
             self.send_button.setText("💌 메시지 전송")
             self.emergency_stop_button.setEnabled(False)
             self.preview_button.setText("📋 메시지 미리보기")

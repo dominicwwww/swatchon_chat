@@ -421,3 +421,25 @@ Traceback (most recent call last):
 AttributeError: 'ShipmentRequestTable' object has no attribute 'update_selection_count'. Did you mean: '_update_selection_label'?
 
 ===================
+
+=== 전역 예외 발생 ===
+시간: 2025-07-02 09:39:33
+타입: <class 'IndentationError'>
+값: expected an indented block after 'if' statement on line 189 (shipment_request_table.py, line 191)
+Traceback (most recent call last):
+  File "D:\dev\swatchon_chat\main.py", line 42, in <module>
+    from ui.main_window import MainWindow
+  File "D:\dev\swatchon_chat\ui\__init__.py", line 4, in <module>
+    from ui.main_window import MainWindow
+  File "D:\dev\swatchon_chat\ui\main_window.py", line 22, in <module>
+    from ui.sections.fbo.fbo_po_section import FboPoSection
+  File "D:\dev\swatchon_chat\ui\sections\fbo\__init__.py", line 4, in <module>
+    from ui.sections.fbo.shipment_request_section import ShipmentRequestSection
+  File "D:\dev\swatchon_chat\ui\sections\fbo\shipment_request_section.py", line 20, in <module>
+    from ui.components.shipment_request_table import ShipmentRequestTable
+  File "D:\dev\swatchon_chat\ui\components\shipment_request_table.py", line 191
+    label = QLabel()
+    ^^^^^
+IndentationError: expected an indented block after 'if' statement on line 189
+
+===================
